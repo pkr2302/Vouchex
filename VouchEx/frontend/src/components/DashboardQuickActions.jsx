@@ -1,7 +1,13 @@
-import { Plus, Receipt, TrendingDown, CreditCard, ShoppingCart } from 'lucide-react';
+import { Plus, Receipt, TrendingDown, CreditCard, ShoppingCart, Users, Truck } from 'lucide-react';
+import { queuePortalFormIntent } from '../utils/portalFormIntent';
 
 export default function DashboardQuickActions({ setActiveTab }) {
   if (!setActiveTab) return null;
+
+  const goToTabWithAddForm = (tabId) => {
+    queuePortalFormIntent(tabId, 'add');
+    setActiveTab(tabId);
+  };
 
   const actions = [
     { key: 'invoice', label: 'Add Sales Invoice', icon: Plus, onClick: () => setActiveTab('sales') },
@@ -9,6 +15,8 @@ export default function DashboardQuickActions({ setActiveTab }) {
     { key: 'receipt', label: 'Add Receipt', icon: Receipt, onClick: () => setActiveTab('receipt') },
     { key: 'expense', label: 'Record Expense', icon: TrendingDown, onClick: () => setActiveTab('expense') },
     { key: 'payment', label: 'Add Payment', icon: CreditCard, onClick: () => setActiveTab('payment') },
+    { key: 'customer', label: 'Add Customer Profile', icon: Users, onClick: () => goToTabWithAddForm('customer-master') },
+    { key: 'vendor', label: 'Add Vendor Profile', icon: Truck, onClick: () => goToTabWithAddForm('vendor-master') },
   ];
 
   return (
