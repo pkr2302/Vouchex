@@ -1,0 +1,11 @@
+/vendor/
+/node_modules/
+.env
+.env.backup
+storage/*.key
+storage/logs/*.log
+bootstrap/cache/*.php
+frontend/node_modules/
+frontend/dist/
+.DS_Store
+Thumbs.db

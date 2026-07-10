@@ -1,0 +1,771 @@
+================================================================================
+VOUCHEX — MOBILE WEB UI REVIEW BRIEF
+Document purpose: Give an external reviewer (e.g. ChatGPT) full context to judge
+whether VouchEx's mobile website UX is sufficient for real-world SME/CA users in India.
+Production URL: https://vouchex.kuhu.org.in
+Last updated: June 2026
+================================================================================
+
+
+SECTION 1 — INTRODUCTION TO VOUCHEX
+================================================================================
+
+VouchEx is a cloud-based GST accounting and business-management portal built for
+Small & Medium Enterprises (SMEs) and Chartered Accountants (CAs) in India.
+
+Tagline: "Accounts Made Simple"
+
+It is NOT a native iOS/Android app. It is a responsive single-page web application
+(SPA) built with React 19 + Vite on the frontend and Laravel 11 API on the backend.
+Users access it through mobile browsers (Chrome, Safari, etc.) on phones and tablets.
+
+Architecture:
+- Multi-company SaaS: one login can manage multiple isolated companies (super admin)
+- Single database with company_id isolation per tenant
+- Desktop-first UI inspired by ClearBooks-style accounting portals
+- Mobile support added via CSS media queries (not a separate mobile app)
+
+Primary audience:
+- Business owners who need invoicing, expenses, GST compliance on the go
+- CAs managing multiple client companies
+- Trial users evaluating the product from marketing landing page
+
+
+SECTION 2 — WHAT VOUCHEX OFFERS (VALUE PROPOSITION)
+================================================================================
+
+Core promise:
+Complete day-to-day accounting + GST compliance in one browser portal, without
+installing desktop software.
+
+What users can do end-to-end:
+1. Register / trial / subscribe (SaaS onboarding)
+2. Set up company profile (GSTIN, PAN, bank, accounting framework AS or Ind AS)
+3. Maintain masters: customers, vendors, products/services, chart of accounts
+4. Record commercial documents: sales invoices, purchase bills, expenses, receipts,
+   payments, credit notes, debit notes
+5. Manage inventory, stock consumption, cash & bank ledgers
+6. View debtors/creditors ageing, party ledgers, forex receipts
+7. Generate financial statements (Trial Balance, P&L, Balance Sheet, Notes)
+8. GL registers: ledgers, day book, sales register, purchase register, misc entries
+9. GST taxation workspace: GSTR-1/2B/3B views, TDS, compliance calendar, exports
+10. Settings: users, financial year lock, backups, audit trail, subscriptions
+11. E-invoice / e-way bill readiness (where enabled)
+12. OCR bill scanning simulation on invoices/expenses
+13. PDF generation and export (Excel/CSV) for reports and tax filings
+
+Accounting depth:
+- Double-entry general ledger (GL) with automatic posting from vouchers
+- Supports AS and Ind AS accounting frameworks
+- Report groups, COA auto-mapping, guided journal entries
+- Financial period filtering (FY, quarter, half-year, custom dates)
+
+Compliance focus:
+- Indian GST (CGST/SGST/IGST bifurcation, place of supply, HSN/SAC)
+- TDS receivable/payable tracking
+- Statutory calendar with tasks and reminders
+- GSTR-oriented register exports
+
+
+SECTION 3 — COMPLETE FEATURE LIST
+================================================================================
+
+A. AUTHENTICATION & ONBOARDING
+   - Marketing landing page (public)
+   - Email/password login and registration
+   - Google OAuth sign-in
+   - Set-password step for trial owners
+   - Company onboarding wizard (new company creation)
+   - Subscription / upgrade payment flow
+   - Session inactivity auto-logout with warning modal
+   - Role-based access: super_admin, admin, user, trial_owner
+
+B. DASHBOARD & EXECUTIVE VIEWS
+   - Dashboard (compliance-oriented home)
+   - Company 360° (KPI metrics, charts, draggable widgets)
+   - Quick actions bar (5 shortcuts)
+   - Needs-attention alert cards
+   - Mini KPI strip + compliance strip
+   - Compliance calendar panel
+   - Tasks & reminders sidebar
+   - Recent activity feed
+
+C. MASTERS
+   - Customer Master (full CRUD, GSTIN, addresses, payment terms, opening balance)
+   - Vendor Master (full CRUD, GST category, PAN, opening balance)
+   - Chart of Accounts (legacy ledgers + manual GL accounts + report groups)
+   - Inventory master (products/services, HSN/SAC, stock, pricing)
+
+D. INCOME / SALES
+   - Sales invoices (B2B, B2C, Export; multi-currency; line items; GST)
+   - Invoice OCR upload simulation
+   - E-invoice generation modal
+   - E-way bill generation modal
+   - PDF invoice viewer/print modal
+   - Credit notes (sales returns)
+   - Receipts (standard + advance + forex)
+   - Debtors listing + ageing report
+
+E. EXPENSES / PURCHASE
+   - Purchase invoices (line-item mode)
+   - General expenses (single or line items)
+   - OCR bill scanning
+   - Recurring expense flags
+   - ITC eligibility, TDS deduction
+   - Payments (registry, dashboard, creditors ageing, advance)
+   - Debit notes (purchase returns)
+   - Creditors listing + ageing report
+   - Vendor party ledger modal
+
+F. CASH & BANK
+   - Cash ledger accounts
+   - Bank accounts
+   - Ledger statement drill-down modal per account
+
+G. INVENTORY
+   - Product/service registry
+   - Stock levels, low-stock thresholds
+   - Consumption entries (stock reduction + expense head mapping)
+
+H. FINANCIAL REPORTING
+   - Trial Balance (grouped condensed/detailed, comparative prior year)
+   - Profit & Loss (with COGS/gross profit rows, drill-down to ledger)
+   - Balance Sheet (grouped, comparative)
+   - Notes to Accounts panel
+   - Period bar: FY selector, YTD/Q/H presets, custom date range
+   - Export: Excel, PDF print modal
+   - GL sync result modal
+
+I. REGISTERS (GL)
+   - Ledgers (pick account → open statement modal)
+   - Day Book (chronological journal lines)
+   - Sales Register (GST-friendly)
+   - Purchase Register (GST-friendly)
+   - Misc Entries: guided actions + manual journal
+
+J. GUIDED / MISC GL ENTRIES
+   - Bank/cash transfer (contra)
+   - Capital introduction
+   - Owner withdrawal (drawings)
+   - Loan received / loan repayment
+   - Depreciation
+   - Statutory payment (GST/TDS)
+   - Manual multi-line journal (advanced)
+
+K. TAXATION
+   - Tax summary dashboard
+   - GSTR-1 view
+   - GSTR-2B view
+   - GSTR-3B view
+   - TDS summary
+   - Compliance / ECRS logs
+   - Tax export modal (CSV/Excel, Tally formats)
+   - RCM ledger balance simulation
+
+L. SETTINGS
+   - Company profile (name, GSTIN, PAN, address, bank, framework)
+   - Company logo upload (paid plans)
+   - GST compliance toggles (e-invoice, e-way bill)
+   - Manage companies (super admin)
+   - User management (create/edit/delete users)
+   - Financial year lock + month locks
+   - Login & audit trail
+   - Data backup download + restore
+   - System health
+   - Subscription payments
+   - Inactivity timeout configuration
+
+M. CROSS-CUTTING UI
+   - Super-admin company switcher in header
+   - User avatar + name + role + logout
+   - Trial banner in header
+   - Console drawer (developer-style API log — bottom of screen on desktop)
+   - Skeleton loaders on tab switch
+   - Due reminder popup modal
+   - Document share buttons
+   - Inline quick-add modals: customer, vendor, inventory item
+
+
+SECTION 4 — NAVIGATION STRUCTURE (SIDEBAR → TABS → SUB-TABS)
+================================================================================
+
+The logged-in portal uses a LEFT SIDEBAR with collapsible groups. Each group
+contains menu links. Clicking a link switches the main content area (no URL routes
+for most tabs — state-based tab switching).
+
+SIDEBAR GROUPS AND ITEMS (top to bottom):
+-----------------------------------------
+
+1. Executive Summary
+   - Dashboard                    (tab id: dashboard)
+   - Company 360°                   (tab id: company-360)
+   - Chart of Accounts              (tab id: coa)
+   - Financial Statements           (tab id: financials)
+
+2. Masters
+   - Customer Master                (tab id: customer-master)
+   - Vendor Master                  (tab id: vendor-master)
+
+3. Income
+   - Sales                          (tab id: sales) — shows Sales Invoices only
+   - Sales Return                   (tab id: sales-return)
+   - Receipts                       (tab id: receipt)
+   - Debtors                        (tab id: debtors)
+
+4. Expenses
+   - Purchase                       (tab id: purchase)
+   - Purchase Return                (tab id: purchase-return)
+   - Expenses                       (tab id: expense)
+   - Payments                       (tab id: payment)
+   - Creditors                      (tab id: creditors)
+
+5. Cash & Bank
+   - Cash & Bank                    (tab id: cash-bank)
+
+6. Inventory
+   - Inventory                      (tab id: inventory)
+   - Consumption                    (tab id: consumption)
+
+7. Registers
+   - Ledgers                        (tab id: ledgers)
+   - Day Book                       (tab id: day-book)
+   - Sales Register                 (tab id: sales-register)
+   - Purchase Register              (tab id: purchase-register)
+   - Misc Entries                   (tab id: misc-entries)
+
+8. Taxation
+   - Taxation                       (tab id: taxation)
+
+9. Settings
+   - Settings                       (tab id: settings)
+
+Note: tax-calendar (tab id: tax-calendar) exists in code but is NOT in sidebar;
+      it may be reachable only programmatically — treat as legacy/hidden.
+
+Sidebar behavior:
+- Groups expand/collapse with chevron; state persisted in localStorage
+- Active group auto-expands when child tab is selected
+- Footer shows company name + GSTIN badge
+
+SUB-TABS WITHIN MAIN TABS:
+--------------------------
+
+Chart of Accounts (coa):
+  - Ledgers | Report Groups
+
+Cash & Bank (cash-bank):
+  - Cash | Bank
+
+Debtors (debtors):
+  - Listing | Ageing
+
+Creditors (creditors):
+  - Listing | Ageing
+
+Financial Statements (financials):
+  - Trial Balance | Profit & Loss | Balance Sheet | Notes to Accounts
+  - Within TB/P&L/BS: Condensed | Detailed toggle
+  - Financial period bar above content
+
+Receipts (receipt) — horizontal sub-tab strip:
+  - Payment Registry | Receipts Dashboard | Debtors Ageing | Forex Receipts
+  - Within advance receipt form: Standard | Advance mode toggle
+
+Payments (payment) — horizontal sub-tab strip:
+  - Payment Registry | Payments Dashboard | Creditors Ageing | Record Advance Payment
+
+Taxation (taxation) — horizontal sub-tab strip (6 items):
+  - Summary | GSTR-1 | GSTR-2B | GSTR-3B | TDS | Compliance
+
+Settings (settings):
+  Main nav (super admin only): Company Settings | Website Settings
+  Sub-tabs under Company Settings:
+    - Company Details | GST Compliance | Manage Companies (super admin)
+    - User Management | Financial Year Lock
+  Sub-tabs under Website Settings (super admin):
+    - Login & Audit Trail | Data Backups & Restore | System Health
+    - Subscription Payments
+
+Income tab (legacy combined view — NOT used from sidebar; sidebar goes direct to sales):
+  - Sales Invoices & Billing | Customer Ledger Master | Issue Credit Note
+
+Sales sidebar entry uses invoices-only mode (no sub-tab strip).
+
+Vendor Master sidebar entry = vendor-only mode (no expense sub-tabs visible).
+
+Purchase sidebar entry = purchaseMode with line items default.
+
+Expense sidebar entry = expense bills (non-purchase record type).
+
+Registers tabs share FinancialPeriodBar + table layout; Ledgers adds account picker.
+
+
+SECTION 5 — PAGE-BY-PAGE LAYOUT, POSITIONING & UI ELEMENTS
+================================================================================
+
+GLOBAL PORTAL SHELL (all logged-in pages)
+-----------------------------------------
+
+Desktop (width > 1024px):
+  Layout: flex row
+  - Left sidebar: fixed width 280px (--sidebar-width), sticky, full viewport height
+    Dark navy gradient, logo top, grouped menu scrollable, company badge footer
+  - Main content: flex-grow, min-height 100vh
+    - Sticky header: 70px height, page title left, user actions right
+    - Tab container: padded content area (32px desktop padding)
+
+Mobile / tablet (width <= 1024px):
+  Layout: block (single column)
+  - Sidebar: position FIXED, off-screen left (translateX -100%), width min(280px, 88vw, 300px)
+    Slides in when open; z-index 1000; shadow
+  - Sidebar close button (X): top-right inside sidebar logo row, 40×40px
+  - Backdrop: fixed full-screen rgba overlay z-index 999 when menu open
+  - Scroll lock: html gets class nav-scroll-lock when menu open (body overflow hidden)
+  - Main content: width 100%, max-width 100vw, overflow-x hidden, vertical scroll
+  - Hamburger button: 40×40px, grid area "menu" in header, toggles sidebar
+  - Header: CSS grid 3-row layout on mobile:
+      Row 1: [hamburger] [page title + "Portal" label + clock] [actions]
+      Row 2: trial banner full width (if active)
+    Padding: 8–12px; min-height ~52px (auto height)
+  - Page title: truncates with ellipsis; "Portal" suffix hidden at <=640px
+  - Header clock: hidden at <=768px
+  - Company select (super admin): shrinks to ~76–140px width on small screens
+  - User info text (name/role): hidden at <=640px; avatar + logout remain
+
+Mobile / small phone (width <= 640px):
+  - Safe-area insets for notch (padding-top/left/right using env(safe-area-inset-*))
+  - Tab container padding: 10–16px with safe areas
+  - Dashboard quick actions: 2-column grid, 48px min button height
+  - Dashboard attention cards: single column
+  - Dashboard mid-row (KPI + compliance): single column grid
+  - Dashboard compliance layout (calendar + tasks): single column
+  - Modal overlays: full padding with safe areas; modal card width 100%
+
+
+MARKETING LANDING PAGE (logged-out, guest)
+------------------------------------------
+  - Sticky header with logo, desktop nav links, mobile hamburger
+  - Mobile drawer nav with backdrop (separate from portal sidebar)
+  - Sections: hero, features, stats, testimonials, pricing CTA, footer
+  - Scroll-to-top button after 400px scroll
+  - CTAs: Start trial → auth register; Sign in → auth login
+
+
+AUTH PAGES (logged-out)
+-----------------------
+  - Auth card centered on page
+  - Mobile: auth-wrapper padding reduced, align flex-start, top padding 24px
+  - Forms: email, password, Google button, back to marketing link
+
+
+ONBOARDING / SUBSCRIPTION / SET-PASSWORD
+----------------------------------------
+  - Full-page standalone screens (no sidebar)
+  - Form grids collapse to 1 column at <=768px
+  - Subscription plans: 1 column at <=768px
+
+
+DASHBOARD (tab: dashboard)
+--------------------------
+Top to bottom vertical stack:
+
+1. Quick Actions (dashboard-quick-actions)
+   - 5 buttons in grid: Add Sales Invoice, Add Purchase Invoice, Add Receipt,
+     Record Expense, Add Payment
+   - Desktop: horizontal/wrapped grid
+   - Mobile <=640px: 2 columns, icon above label, 11px font, 48px min height
+
+2. Needs Attention panel (dashboard-attention)
+   - Section title + subtitle
+   - Grid of alert cards (warning/critical/info severity colors)
+   - Each card: icon, title, detail, optional amount, "Open >" link
+   - Mobile: single column cards
+
+3. Mid row (dashboard-mid-row) — 2 columns desktop, 1 column mobile
+   - Mini KPI strip (click opens Company 360)
+   - Compliance strip (GST readiness indicators)
+
+4. Compliance layout (dashboard-compliance-layout) — 2 columns desktop, 1 mobile
+   - Compliance calendar panel (month grid, filters, add task/reminder)
+   - Tasks & reminders sidebar list
+
+5. Recent activity feed
+
+Modals from dashboard:
+  - CalendarReminderFormModal (add/edit task or reminder)
+
+
+COMPANY 360° (tab: company-360)
+-------------------------------
+  - Quick actions (same 5 buttons)
+  - Time filter bar (Last Month, Last Quarter, YTD, Custom dates)
+  - KPI grid (metric cards)
+  - Draggable chart layout (sales, expenses, bank/cash charts)
+  - Charts may be dense on small screens — no dedicated mobile chart simplification
+
+
+FINANCIAL STATEMENTS (tab: financials)
+----------------------------------------
+  - FinancialPeriodBar (top): FY dropdown, preset pills (YTD/Q/H/custom), date inputs, OK button
+    Mobile <=768px: stacks vertically; pills horizontal scroll; 44px touch targets; 16px inputs
+  - Sub-tab strip: Trial Balance | P&L | Balance Sheet | Notes (horizontal scroll mobile)
+  - Condensed/Detailed toggle for grouped views
+  - Toolbar: Sync GL, Export, Print PDF buttons — stack full width on mobile
+  - GroupedReportTable: hierarchical account rows, expandable groups
+  - Click account row → LedgerStatementModal drill-down
+  - Modals: FinancialExportModal (420px), PdfPrintModal (800px max), GlSyncResultModal
+
+
+CHART OF ACCOUNTS (tab: coa)
+----------------------------
+  - Sub-tabs: Ledgers | Report Groups
+  - Ledgers view: table of COA accounts + Add ledger picker
+  - Report Groups: tree panel + mapping UI
+  - Modals: CoaLedgerFormModal (600px), CoaAccountFormModal (620px),
+    AddLedgerPickerModal, CoaInstructionsModal (640px), GroupFormModal (520px)
+
+
+SALES / INVOICES (tab: sales)
+-----------------------------
+  - Registry view: search, date filters, Add Invoice button
+  - Invoice form (expandable, long):
+      Sections: customer select (+ quick add), invoice meta, addresses, place of supply,
+      export fields, currency, line items table, discount, totals, file upload, OCR scan
+  - Line items: multi-row table with product, qty, rate, tax — WIDE TABLE (horizontal scroll
+    via premium-table-wrapper on mobile — known pain point for very small screens)
+  - Registry table: many columns (invoice #, customer, dates, amounts, status, actions)
+  - Row actions: Edit, Delete, PDF, E-invoice, E-way bill, Share
+  - Modals: InlineCustomerModal, InlineInventoryModal, PdfPrintModal, EinvoiceGenerateModal,
+    EwayBillGenerateModal, PremiumFeatureModal (logo paywall)
+
+
+CUSTOMER MASTER (tab: customer-master)
+---------------------------------------
+  - Add/Edit form: multi-section (identity, GST, addresses, payment terms, opening balance)
+  - form-grid-2/3/4 → 1 column on mobile
+  - Registry table with Edit/Delete/Ledger actions
+
+
+SALES RETURN / CREDIT NOTES (tab: sales-return)
+-------------------------------------------------
+  - Similar to invoices: form + registry, line items, link to customer
+
+
+RECEIPTS (tab: receipt)
+-----------------------
+  - 4 sub-tabs (horizontal scroll on mobile)
+  - Registry table + receipt form (customer, amount, TDS, allocation to invoices)
+  - Advance mode sub-toggle within form
+  - Forex sub-tab: multi-currency receipt entries
+  - Ageing sub-tab: debtors ageing table
+
+
+DEBTORS (tab: debtors)
+----------------------
+  - Listing | Ageing sub-tabs
+  - Tables with outstanding balances
+
+
+PURCHASE (tab: purchase)
+------------------------
+  - Purchase bill form with line items (like sales)
+  - Vendor select + inline vendor modal
+  - Registry of purchase bills
+
+
+EXPENSES (tab: expense)
+-----------------------
+  - Expense bill form (single amount or line items toggle)
+  - OCR scan, ITC, TDS, payment status, recurring options
+  - Registry table
+
+
+PURCHASE RETURN / DEBIT NOTES (tab: purchase-return)
+----------------------------------------------------
+  - Debit note form + registry
+
+
+PAYMENTS (tab: payment)
+-----------------------
+  - 4 sub-tabs (horizontal scroll)
+  - Payment form, registry, dashboard metrics, creditors ageing, advance payment
+
+
+CREDITORS (tab: creditors)
+--------------------------
+  - Listing | Ageing sub-tabs
+
+
+VENDOR MASTER (tab: vendor-master)
+--------------------------------
+  - Vendor form (3 sections: identity, legal/tax, address, opening balance)
+  - Vendor registry table with Edit/Delete/View Party Ledger
+  - Party ledger opens modal with transaction list
+
+
+CASH & BANK (tab: cash-bank)
+----------------------------
+  - Cash | Bank sub-tabs
+  - Account cards/list + balances
+  - View Statement → LedgerStatementModal
+
+
+INVENTORY (tab: inventory)
+--------------------------
+  - Add product/service form: type, SKU, HSN/SAC, UOM, prices, tax, stock
+  - Registry table
+
+
+CONSUMPTION (tab: consumption)
+------------------------------
+  - Header row: title + Add button
+  - Form: date, product, quantity, expense head, reference
+  - Consumption register table
+
+
+REGISTERS — LEDGERS (tab: ledgers)
+----------------------------------
+  - Title + description
+  - FinancialPeriodBar
+  - Account dropdown (select GL account)
+  - Open Statement button → LedgerStatementModal (opening/closing balance, lines table)
+  - Ledger summary cards stack 1 column on mobile
+
+
+REGISTERS — DAY BOOK (tab: day-book)
+------------------------------------
+  - Period bar + chronological table (date, journal, accounts, debit, credit)
+
+
+REGISTERS — SALES / PURCHASE REGISTER
+-------------------------------------
+  - Period bar + GST register table
+  - Mobile <=768px: GSTIN and tax columns hidden (.col-gstin, .col-tax) to save width
+  - Remaining columns still may require horizontal scroll
+
+
+MISC ENTRIES (tab: misc-entries)
+--------------------------------
+  - Title + refresh button (header row)
+  - Action picker grid: auto-fill minmax(220px, 1fr) — wraps on mobile
+  - Active action form: 2-column grid → 1 column mobile
+  - Manual journal section below:
+      Line editor table transforms to stacked cards on mobile (thead hidden, each row a card)
+  - Recent journals table (standard premium-table scroll)
+
+
+TAXATION (tab: taxation)
+------------------------
+  - 6 sub-tabs in styled bar (horizontal scroll on mobile)
+  - Summary: metric cards + tables
+  - GSTR views: large data tables (horizontal scroll expected)
+  - Export button → TaxExportModal (520px)
+  - Compliance: ECRS logs table
+
+
+SETTINGS (tab: settings)
+------------------------
+  - Main tab switcher (super admin): Company | Website
+  - Many sub-tabs (horizontal scroll)
+  - Profile: large multi-field form (company, bank, framework)
+  - GST compliance toggles
+  - Companies CRUD (super admin)
+  - User management table + create user form
+  - Lock controls: FY lock toggle, month picker grid
+  - Backup: download button, restore file input, email backup status
+  - Audit logs tables (login + audit)
+  - Subscription payment UI
+
+
+SECTION 6 — MODALS, OVERLAYS & POPUPS (SIZE & BEHAVIOR)
+================================================================================
+
+Standard Modal component (portalShared.jsx):
+  - Overlay: position fixed, inset 0, z-index 9999, centered flex, padding 20px
+  - Backdrop click closes modal
+  - Card: max-width set per modal (420–640px typical), width 100%, max-height 90vh,
+    overflow-y auto inside card
+  - Mobile <=640px: portal-modal-card forced to width 100%, max-width 100%
+  - Close: × button top-right of header
+
+Modal inventory (typical widths):
+  - 420px: FinancialExportModal
+  - 480px: DueReminderPopup, CalendarReminderFormModal
+  - 520px: default Modal, InlineCustomer/Vendor, GroupFormModal, TaxExportModal
+  - 600px: CoaLedgerFormModal
+  - 620px: CoaAccountFormModal, AutoMapResultModal
+  - 640px: Instructions modals, CoaInstructionsModal
+  - 800px: PdfPrintModal (invoice/report PDF preview with toolbar)
+
+Other overlays:
+  - Sidebar backdrop (portal): z-index 999, rgba(6,18,40,0.55)
+  - Logout inactivity warning: centered card over dim overlay
+  - Premium feature paywall modal
+  - Marketing mobile nav backdrop (separate system)
+
+PdfPrintModal:
+  - Full-screen-ish preview, toolbar with print/close, scrollable content area
+
+
+SECTION 7 — MOBILE CSS BREAKPOINTS & RESPONSIVE RULES
+================================================================================
+
+Primary breakpoints used across App.css:
+  - 1200px: some dashboard/chart grids
+  - 1100px: dashboard layout columns, compliance grids
+  - 1024px: MAIN mobile portal breakpoint — sidebar becomes drawer, hamburger visible
+  - 960px: assorted form/layout tweaks
+  - 768px: forms to 1 column, sub-tab horizontal scroll, financial period bar stack,
+           header clock hidden, auth/subscription adjustments
+  - 640px: phone polish — safe areas, 2-col quick actions, single-col attention cards,
+           modals full width, company select shrink, user name hidden
+
+Touch targets (mobile intent):
+  - Many buttons/inputs bumped to min-height 44px on financial/register areas
+  - Date/select inputs font-size 16px on mobile (prevents iOS zoom-on-focus)
+
+Tables:
+  - Wrapped in .premium-table-wrapper with overflow-x auto and -webkit-overflow-scrolling touch
+  - Most data-heavy screens expect HORIZONTAL SCROLL on phone rather than card transformation
+  - Exceptions: manual journal table uses card-stack pattern; GST register hides columns
+
+Forms:
+  - .form-grid-2, .form-grid-3, .form-grid-4 → single column at <=768px
+
+Sub-tab navigation (.tab-nav-sub):
+  - flex-wrap nowrap + overflow-x auto + hidden scrollbar on mobile
+  - User swipes horizontally to reach later tabs (Payments has 4, Taxation has 6, Settings many)
+
+Viewport meta (index.html):
+  width=device-width, initial-scale=1.0, viewport-fit=cover
+
+
+SECTION 8 — MAIN MOTTO & MOBILE STRATEGY (WHAT WE ARE OPTIMIZING FOR)
+================================================================================
+
+Motto:
+  "Full accounting portal accessible anywhere — not a cut-down companion app."
+
+Mobile strategy (current):
+  - Same feature set as desktop (no feature gating by screen size)
+  - Navigation compressed into hamburger drawer instead of persistent sidebar
+  - Content reflows to single column; wide tables scroll horizontally
+  - Critical workflows (quick actions, attention alerts, create invoice/expense) reachable
+    from dashboard within 1–2 taps
+  - Touch-friendly targets on financial/register flows
+  - Safe-area support for modern phones
+
+NOT current goals:
+  - Native app gestures
+  - Offline mode
+  - Bottom tab bar navigation
+  - Separate simplified "mobile-only" invoice creator
+  - Progressive Web App install prompt (not implemented)
+
+Primary mobile user stories we care about:
+  1. Check dashboard alerts and compliance status on phone
+  2. Quickly add receipt, expense, or view overdue debtors
+  3. Look up a customer/vendor or invoice while on call
+  4. Review P&L or GST summary before filing
+  5. Super admin switches company and checks multiple clients
+
+Known weak areas (honest gaps for reviewer):
+  1. Invoice/expense LINE ITEM tables — wide multi-column; horizontal scroll only
+  2. Taxation GSTR tables — very wide; mobile review is hard
+  3. Company 360 charts — desktop-oriented draggable grid
+  4. Settings with many sub-tabs — requires horizontal swipe to find tab
+  5. Chart of Accounts report groups tree — complex on narrow screens
+  6. Console drawer / developer log — may overlap mobile viewport bottom
+  7. Some action button clusters in table rows wrap but can feel cramped
+  8. Recent fix (June 2026): sidebar CSS cascade bug caused content shifted off-screen
+     on mobile — fixed by enforcing position:fixed sidebar after base styles; needs
+     production deploy verification
+
+Desktop unchanged above 1025px width — all mobile rules inside max-width media queries.
+
+
+SECTION 9 — USER ROLES & HEADER DIFFERENCES
+================================================================================
+
+super_admin:
+  - Sees company dropdown in header (all companies)
+  - Settings: Manage Companies, Website Settings section
+  - Can create/delete companies, manage subscriptions, backups
+
+admin / company admin:
+  - No company switcher (single company context unless assigned multiple)
+  - Settings: profile, GST, users, lock controls
+
+user:
+  - Standard portal access, no user management
+
+trial_owner:
+  - Forced set-password, subscription prompts, trial banner
+
+
+SECTION 10 — DATA DENSITY & TYPICAL FIELD COUNTS
+================================================================================
+
+Sales invoice form: ~25–40 visible fields + dynamic line items (5–8 columns per line)
+Vendor master form: ~20 fields across 3 sections
+Company settings profile: ~18 fields
+Payment receipt form: ~10–15 fields + invoice allocation grid
+Manual journal: 2+ lines × 4 columns (account, debit, credit, memo)
+Financial statements table: 3–5 columns with nested group rows
+Day book register: 6–8 columns
+Tax GSTR-1 view: 10+ columns
+
+
+SECTION 11 — QUESTIONS FOR THE REVIEWER (ChatGPT)
+================================================================================
+
+Please evaluate whether this mobile web approach is SUFFICIENT for Indian SME/CA users.
+
+1. Navigation: Is hamburger + 9 sidebar groups + up to 6 horizontal sub-tabs acceptable,
+   or should we adopt bottom nav / hub pages / role-based shortcuts?
+
+2. Information density: Are horizontal-scrolling tables an acceptable compromise for
+   accounting software on mobile, or should key screens (invoices, GSTR) get dedicated
+   mobile card layouts?
+
+3. Dashboard: Is the compliance-first dashboard the right mobile home, or should quick
+   actions + search dominate?
+
+4. Touch targets & forms: Are 44px targets and 16px inputs adequate? Any screens that
+   clearly fail one-handed use?
+
+5. Modals: Is max-width 100% on phone with 90vh scroll sufficient for long forms
+   (vendor master, invoice)?
+
+6. Missing patterns: What standard mobile accounting app patterns are we missing?
+   (e.g. global search, recent documents, FAB, swipe actions, pull-to-refresh)
+
+7. Performance perception: Tab switching shows skeleton loader — is that OK on mobile?
+
+8. Marketing vs portal: Landing page has its own mobile nav — any inconsistency concerns
+   vs logged-in portal drawer?
+
+9. Priority ranking: If we can only fix 5 mobile UX issues next, which would you pick
+   given the feature list above?
+
+10. Overall verdict: Acceptable v1 mobile web / needs major rework / should ship native
+    app instead?
+
+
+SECTION 12 — TECHNICAL CONTEXT (FOR REVIEWER)
+================================================================================
+
+Frontend: React 19, Vite, single CSS file (App.css ~7100 lines), Lucide icons
+Backend: Laravel 11 REST API, Sanctum auth
+Deployment: Static build in Laravel public/ folder, cPanel hosting
+No separate mobile subdomain or m. site
+Browser support: Modern mobile Chrome/Safari expected
+
+Demo logins (for live testing if needed):
+  Super admin: admin@vouchex.com / user123
+  Demo AS company: admin-as@vouchex.com / user123
+  Demo Ind AS company: admin-indas@vouchex.com / user123
+
+================================================================================
+END OF DOCUMENT — share this entire file with your reviewer for mobile UX assessment.
+================================================================================

@@ -1,0 +1,949 @@
+================================================================================
+VOUCHEX — POST-IMPLEMENTATION MOBILE STRUCTURE (FULL DEPTH)
+For ChatGPT: Review current mobile UX and suggest further improvements
+Version: After "Mobile Premium Transformation" (June 2026)
+Production: https://vouchex.kuhu.org.in
+Build assets: index-BVZ_k7Gi.css, index-BCqM4dKY.js
+================================================================================
+
+PURPOSE OF THIS DOCUMENT
+------------------------
+You (ChatGPT) previously reviewed VouchEx mobile UX and gave a "Mobile Premium
+Transformation" master instruction with 15 improvement areas. The development
+team implemented a coordinated mobile upgrade in ONE cycle while keeping desktop
+(>1024px width) 100% unchanged.
+
+This document describes EXACTLY what the mobile site looks and behaves like NOW —
+every shell element, tab, sub-tab, button, bar, field placement, size, z-index,
+and mobile-specific vs desktop-shared behavior. It also maps YOUR suggestions to
+what was implemented, what was not, why, and what alternative was used instead.
+
+Please read this and suggest ONLY further mobile improvements that:
+- Do not break desktop
+- Use zero paid libraries/services
+- Fit a React + Vite + CSS media-query architecture
+
+
+================================================================================
+PART A — TECHNICAL ARCHITECTURE (HOW MOBILE IS ISOLATED FROM DESKTOP)
+================================================================================
+
+Stack: React 19, Vite, single App.css + separate mobile.css, Laravel 11 API.
+No native app. Mobile browser only (Chrome/Safari on phone).
+
+PRIMARY MOBILE BREAKPOINT: max-width 1024px
+  - All premium mobile components use class "mobile-only" (hidden on desktop)
+  - Registry tables use class "desktop-only" on .premium-table-wrapper (hidden on mobile where cards exist)
+  - mobile.css is imported in main.jsx AFTER App.css
+  - App.css ALSO has @media (max-width: 1024px) rules for sidebar fix (older block)
+
+SECONDARY BREAKPOINTS (still active on mobile):
+  - 768px: financial period bar stacks, form grids → 1 column, header clock hidden
+  - 640px: safe-area insets, dashboard 2-col quick actions, modals full width
+
+DESKTOP GUARANTEE:
+  - Above 1025px: .mobile-only { display: none !important }
+  - Bottom nav, FAB, mobile search, notifications sheet, registry cards — invisible
+  - Desktop sidebar sticky 280px, hamburger hidden, full tables unchanged
+
+Z-INDEX STACK (mobile):
+  1200 — Global search overlay, Notifications panel, Reports sheet
+  1152 — Filter sheet header (when open)
+  1151 — Filter sheet body (when open)
+  1150 — Filter backdrop
+  1101 — FAB button
+  1100 — Bottom navigation bar
+  1099 — FAB backdrop
+  1000 — Sidebar drawer (when open via Menu)
+  999  — Sidebar backdrop
+  50   — Sticky header
+
+
+================================================================================
+PART B — GLOBAL MOBILE SHELL (LOGGED-IN PORTAL)
+================================================================================
+
+Viewport meta: width=device-width, initial-scale=1.0, viewport-fit=cover
+PWA manifest: site.webmanifest — display standalone, portrait-primary, theme #001B5E
+Apple meta: mobile-web-app-capable, apple-mobile-web-app-capable, black-translucent status bar
+NOTE: No service worker registered yet — installable manifest only, not full offline PWA
+
+--------------------------------------------------------------------------------
+B1. PAGE LAYOUT (top to bottom, z-order)
+--------------------------------------------------------------------------------
+
+[LAYER 0 — Full viewport background]
+  .app-layout — display: block (not flex), width 100%, max-width 100vw, overflow-x hidden
+
+[LAYER 1 — Sidebar drawer, OFF-SCREEN by default]
+  Position: fixed, left 0, top 0, bottom 0
+  Size: width min(280px, 88vw, 300px), max-width 300px, height 100dvh
+  Transform: translateX(-100%) — hidden left
+  When open (.sidebar--open): translateX(0), z-index 1000
+  Shadow: 8px 0 32px rgba(0,0,0,0.35)
+  Safe area: padding-top/bottom env(safe-area-inset) at ≤640px
+
+  Sidebar contents (top → bottom):
+    1. Logo row (.sidebar-logo): flex space-between
+       - VouchEx brand (centered variant)
+       - Close button (.sidebar-close-btn): 40×40px, border-radius 10px, white/10% bg
+    2. Grouped menu (.sidebar-menu--grouped): scrollable
+       - 9 collapsible groups (see Part C navigation tree)
+       - Group heading button: chevron 14px + label
+       - Menu links: icon 18px + label, full width tap targets
+    3. Footer (.sidebar-footer): company badge — name + GSTIN
+
+  Backdrop when sidebar open:
+    .sidebar-backdrop — fixed inset 0, z-index 999, rgba(6,18,40,0.55)
+    Tap closes sidebar; scroll locked via html.nav-scroll-lock
+
+  HOW USER OPENS SIDEBAR ON MOBILE:
+    - Bottom nav "Menu" tab (NOT top hamburger — hamburger is display:none on mobile)
+
+[LAYER 2 — Main content column]
+  .main-content — width 100%, min-height 100dvh, overflow-y auto, touch scroll
+  padding-bottom: calc(88px + safe-area-inset-bottom) — clears bottom nav + FAB zone
+
+  Inside main-content:
+
+  ┌─────────────────────────────────────────────────────────────┐
+  │ STICKY HEADER (.header) — z-index 50                        │
+  │ Grid: 2 rows × 2 cols                                       │
+  │   Row1: [page-title] [header-actions]                       │
+  │   Row2: [trial banner full width if active]                 │
+  │ Padding: 10px 14px (640px: + safe-area top/left/right)      │
+  │ Min-height: 48px, auto height                               │
+  ├─────────────────────────────────────────────────────────────┤
+  │ TAB CONTAINER (.tab-container)                              │
+  │ Padding: 16px 12px (640px: 10–16px + safe-area)             │
+  │ padding-bottom: 24px + safe-area                            │
+  │ Optional: .mobile-tab-loading → shimmer top bar 3px         │
+  │ Active tab content (see Part D per tab)                       │
+  └─────────────────────────────────────────────────────────────┘
+
+[LAYER 3 — Fixed bottom chrome]
+  Bottom nav: fixed bottom, height 64px + safe-area-inset-bottom, z-index 1100
+  FAB: fixed right 16px, bottom calc(76px + safe-area), 56×56px circle, z-index 1101
+
+[LAYER 4 — Overlays (conditional)]
+  Global search: fixed inset 0, z-index 1200
+  Notifications: right slide-over max 360px wide, z-index 1200
+  Reports sheet: bottom sheet max 85vh, z-index 1200
+  FAB menu + backdrop: z-index 1099–1100
+  Modals (portal-modal): z-index 9999 (unchanged from desktop)
+
+--------------------------------------------------------------------------------
+B2. STICKY HEADER — ELEMENT BY ELEMENT
+--------------------------------------------------------------------------------
+
+ROW 1 LEFT — Page title (.page-title)
+  Grid area: title
+  Font: 17px, weight 700
+  Contains:
+    - Active tab label from TAB_TITLES() e.g. "Dashboard", "Sales"
+    - Span ".page-title-portal" text "Portal" — HIDDEN at ≤640px
+    - HeaderClock component — HIDDEN at ≤768px
+
+ROW 1 RIGHT — Header actions (.header-actions)
+  Grid area: actions (via .header-end display:contents)
+  Flex row, gap 4px, max-width none on mobile
+
+  Elements left-to-right:
+  1. Notifications bell (.mobile-header-notifications) — MOBILE ONLY
+     Size: 40×40px, border-radius 10px, border 1px, bg secondary
+     Icon: emoji 🔔 18px
+     Badge (.mobile-header-notifications__badge): if count > 0
+       Position: top 2px right 2px, min-width 16px, height 16px, red #ef4444, font 10px
+       Shows "9+" if count > 9
+     Action: opens MobileNotificationsPanel (right drawer)
+
+  2. Company select (.header-company-select) — SUPER ADMIN ONLY
+     At ≤640px: max-width min(42vw, 140px), min-width 96px, font 12px
+     At ≤768px (App.css): max-width 92px width 92px
+     Dropdown of all companies
+
+  3. User profile (.user-profile)
+     Avatar circle 28px gradient
+     .user-info (name + role) — HIDDEN at ≤640px
+     Only avatar visible on small phones
+
+  4. Logout button (.logout-btn)
+     Size: 40×40px, border-radius 10px, border 1px
+
+ROW 2 — Header extras (.header-extras)
+  Full width row below title/actions
+  Contains TrialBanner when trial active — full width, font ~11px
+
+REMOVED ON MOBILE (vs old mobile):
+  - Top-left hamburger (.mobile-menu-btn) — display none (replaced by bottom Menu)
+
+--------------------------------------------------------------------------------
+B3. BOTTOM NAVIGATION (.mobile-bottom-nav)
+--------------------------------------------------------------------------------
+
+Position: fixed, left 0, right 0, bottom 0
+Height: calc(64px + env(safe-area-inset-bottom))
+Background: rgba(255,255,255,0.96) + blur 12px
+Border-top: 1px var(--border-color)
+Shadow: 0 -4px 24px rgba(15,23,42,0.08)
+
+5 equal-width tabs (flex: 1 each), column layout icon + label:
+
+| Tab      | Icon            | Action                                      | Active state        |
+|----------|-----------------|---------------------------------------------|---------------------|
+| Home     | LayoutDashboard | navigateTab('dashboard')                    | blue if activeTab=dashboard |
+| Search   | Search          | Opens full-screen MobileGlobalSearch        | never "active"      |
+| Create   | PlusCircle      | Opens FAB menu (setFabOpen true)            | never "active"      |
+| Reports  | BarChart3       | Opens MobileReportsSheet bottom sheet       | never "active"      |
+| Menu     | Menu            | Toggles sidebar open/close                  | never "active"      |
+
+Tab button specs:
+  min-height 44px, font 10px weight 600, gap 2px icon-label
+  Icon size 22px, stroke 2 (2.5 when active on Home only)
+  Color: muted default, var(--accent-blue) when active (Home only)
+
+NOTE: "Create" in bottom nav AND separate FAB circle both open same create menu.
+      User sees FAB at bottom-right PLUS can tap Create in nav — intentional redundancy.
+
+--------------------------------------------------------------------------------
+B4. FLOATING ACTION BUTTON (FAB)
+--------------------------------------------------------------------------------
+
+Button (.mobile-fab):
+  Position: fixed, right 16px, bottom calc(76px + safe-area-inset-bottom)
+  Size: 56×56px circle
+  Background: gradient blue (#2563eb → #1d4ed8)
+  Shadow: 0 8px 24px rgba(37,99,235,0.45)
+  Icon: Plus 26px (closed) / X 26px (open)
+  When open: gray gradient, z-index 1101
+
+FAB menu (.mobile-fab-menu) — opens above FAB:
+  Position: fixed, right 16px, bottom calc(140px + safe-area)
+  Max-width: min(280px, calc(100vw - 32px))
+  Column of 7 action buttons, gap 8px
+  Animation: fade + translateY, staggered 40ms per item
+
+| # | Label           | Navigates to tab   | Description text        |
+|---|-----------------|--------------------|-------------------------|
+| 1 | Sales Invoice   | sales              | Raise new invoice       |
+| 2 | Purchase Bill   | purchase           | Record purchase         |
+| 3 | Expense         | expense            | Record expense          |
+| 4 | Receipt         | receipt            | Customer receipt        |
+| 5 | Payment         | payment            | Vendor payment          |
+| 6 | Customer        | customer-master    | Add customer            |
+| 7 | Vendor          | vendor-master      | Add vendor              |
+
+Each menu item: white card, padding 12×14px, border-radius 12px
+  Icon box: 36×36px, border-radius 10px, light blue/teal gradient bg
+  Title: 13px bold; subtitle: 11px muted
+
+Backdrop when open: fixed inset, rgba(6,18,40,0.45), z-index 1099
+
+LIMITATION: FAB navigates to tab only — does NOT auto-open "Add" form on that tab.
+User lands on registry view and must tap "Raise New Invoice" etc. manually.
+
+--------------------------------------------------------------------------------
+B5. GLOBAL SEARCH (MobileGlobalSearch)
+--------------------------------------------------------------------------------
+
+Trigger: Bottom nav "Search" tab
+Layout: Full-screen overlay, z-index 1200, bg var(--bg-primary)
+
+HEADER:
+  Padding: max(12px, safe-area-top) 12px 12px
+  Flex row: [search input wrap flex 1] [close 44×44px]
+  Input wrap: height 48px, border-radius 12px, padding 0 14px, font 16px (no iOS zoom)
+  Placeholder: "Customers, invoices, GSTIN, vouchers…"
+  Close: X icon 22px
+
+BODY: scrollable, padding 16px
+
+SECTION "Recent" (when query empty AND localStorage has recent items):
+  Up to 8 items from localStorage key vouchex.mobile.recent
+  Max 12 stored total
+
+SECTION "Results" (when query non-empty):
+  Client-side index built from in-memory data (no API call)
+  Max 30 results, multi-term AND match on label+sublabel+keywords
+
+SEARCH INDEX INCLUDES:
+  ✓ Customers → tab customer-master (name, GSTIN, email, phone, PAN)
+  ✓ Vendors → tab vendor-master
+  ✓ Invoices → tab sales
+  ✓ Expenses → tab expense
+  ✓ Purchases (expenses with record_type purchase) → tab purchase
+  ✓ Receipts → tab receipt
+  ✓ Payments → tab payment
+  ✓ Inventory products → tab inventory
+  ✓ Company GSTIN entry → tab settings
+
+SEARCH INDEX DOES NOT INCLUDE:
+  ✗ GL ledger accounts / ledgers by name
+  ✗ Credit notes, debit notes individually
+  ✗ Journal numbers / day book lines
+  ✗ Direct deep-link to specific record (opens tab only, not record detail)
+
+Result row layout:
+  Grid 3-col: [vertical type label] [title + subtitle] [arrow]
+  Padding 14px, border-radius 12px, margin-bottom 8px
+  Type label: 10px uppercase vertical blue text
+
+--------------------------------------------------------------------------------
+B6. NOTIFICATIONS PANEL (MobileNotificationsPanel)
+--------------------------------------------------------------------------------
+
+Trigger: Header bell button
+Layout: Right slide-over drawer, width min(100%, 360px), z-index 1200
+Animation: slide from right 0.25s
+
+Header: "Notifications" + bell icon, close 40×40px
+Body: scrollable list of notification cards
+
+DATA SOURCES (buildMobileNotifications):
+  1. computeAttentionItems from dashboard briefing:
+     - Financial period locked → settings
+     - Company profile incomplete (no GSTIN/state) → settings
+     - Overdue receivables → debtors/sales
+     - Low stock items → inventory
+     - Payables due → creditors
+     (same logic as dashboard "Needs attention" cards)
+  2. Calendar reminders due today or past → dashboard
+  3. Trial ending ≤7 days → settings
+
+Card styling:
+  padding 14px, border-radius 12px, border-left 4px
+  warning/critical: amber border + tinted bg
+  info: blue border
+  Shows title, body, optional ₹ amount, chevron if navigable
+  Tap → navigateTab + close panel
+
+NOT included: push notifications, email alerts, real-time websocket
+
+--------------------------------------------------------------------------------
+B7. REPORTS SHEET (MobileReportsSheet)
+--------------------------------------------------------------------------------
+
+Trigger: Bottom nav "Reports"
+Layout: Bottom sheet, max-height 85vh, rounded top 20px, z-index 1200
+Backdrop: rgba(6,18,40,0.5) tap to close
+
+9 report links (each navigates tab + closes sheet):
+
+| Label                  | Tab id            | Description                        |
+|------------------------|-------------------|------------------------------------|
+| Financial Statements   | financials        | P&L, Balance Sheet, Trial Balance|
+| Company 360°           | company-360       | KPIs and charts                    |
+| Ledgers                | ledgers           | Account-wise statements            |
+| Day Book               | day-book          | All journal entries                |
+| Sales Register         | sales-register    | GST sales register                 |
+| Purchase Register      | purchase-register | GST purchase register              |
+| Taxation               | taxation          | GSTR, TDS, compliance              |
+| Debtors                | debtors           | Receivables & ageing               |
+| Creditors              | creditors         | Payables & ageing                  |
+
+Each row: padding 14px, border-radius 12px, title 14px + desc 12px muted + chevron
+
+NOT in reports sheet: COA, misc entries, cash-bank, inventory, settings, individual masters
+
+--------------------------------------------------------------------------------
+B8. RECENT ACTIVITY STRIP (MobileRecentStrip) — Dashboard only
+--------------------------------------------------------------------------------
+
+Position: Dashboard tab, CSS order 2 (after quick actions, before attention)
+Section title: "Recently viewed" with Clock icon 16px, font 13px
+
+Horizontal scroll row of chips (.mobile-recent-chip):
+  padding 8×12px, border-radius 20px, max-width 200px per chip
+  Type: 9px uppercase blue; label truncated ellipsis
+  Data: localStorage recent (excludes type 'tab' from chip display)
+  Tap: navigateTab to stored tab
+
+Populated when: user selects search result, or visits tabs (trackTabVisit)
+
+
+================================================================================
+PART C — SIDEBAR NAVIGATION TREE (accessible via bottom Menu)
+================================================================================
+
+Same 27 tabs as desktop. Groups default expanded; state in localStorage.
+
+1. Executive Summary
+   - dashboard, company-360, coa, financials
+2. Masters
+   - customer-master, vendor-master
+3. Income
+   - sales, sales-return, receipt, debtors
+4. Expenses
+   - purchase, purchase-return, expense, payment, creditors
+5. Cash & Bank
+   - cash-bank
+6. Inventory
+   - inventory, consumption
+7. Registers
+   - ledgers, day-book, sales-register, purchase-register, misc-entries
+8. Taxation
+   - taxation
+9. Settings
+   - settings
+
+Hidden tab in code (not in sidebar): tax-calendar
+
+
+================================================================================
+PART D — PER-TAB MOBILE BEHAVIOR (EVERY TAB IN DEPTH)
+================================================================================
+
+Legend:
+  [CARDS] = MobileRegistryCards shown, desktop table hidden
+  [FILTER DRAWER] = MobileFilterShell slide-over for filters
+  [SUBTAB MENU] = MobileSubTabMenu vertical cards replace horizontal sub-tabs
+  [TABLE SCROLL] = premium-table-wrapper horizontal scroll (desktop table unchanged)
+  [FORM STACK] = form-grid-* collapse to 1 column at ≤768px
+  [NO MOBILE SPECIFIC] = same as desktop layout but with global mobile shell/CSS
+
+--------------------------------------------------------------------------------
+D1. DASHBOARD (tab: dashboard)
+--------------------------------------------------------------------------------
+
+CSS class: .dashboard-tab.dashboard-tab--compliance
+Mobile flex column, gap 16px, EXPLICIT CSS ORDER:
+
+ORDER 1 — Quick Actions (.dashboard-quick-actions)
+  5 buttons in grid:
+  At ≤640px: grid 2 columns, gap 8px, min-height 48px per button
+  Font 11px, icon above label (flex-direction column)
+  Buttons: Add Sales Invoice, Add Purchase Invoice, Add Receipt, Record Expense, Add Payment
+  Each navigates setActiveTab to respective tab
+
+ORDER 2 — Recent strip (MobileRecentStrip) — MOBILE ONLY
+
+ORDER 3 — Needs Attention (.dashboard-attention)
+  Section title + subtitle
+  Grid of alert cards — at ≤640px: single column (.dashboard-attention__grid)
+  Cards: severity color (warning/critical/info), icon, title, detail, amount, "Open >"
+  Tappable → navigate to related tab
+
+ORDER 4 — Mid row (.dashboard-mid-row)
+  At ≤640px: single column grid
+  Contains:
+    - Mini KPI strip (tap → company-360)
+    - Compliance strip (GST readiness indicators)
+
+ORDER 5 — Compliance layout (.dashboard-compliance-layout)
+  At ≤640px: single column
+  Contains:
+    - ComplianceCalendarPanel (month grid, filters, add task/reminder)
+    - TasksRemindersSidebar (list with edit/delete)
+
+ORDER 6 — Recent activity (.dashboard-recent-section)
+  DashboardRecentActivity feed, tappable items
+
+Modal from dashboard: CalendarReminderFormModal (480px width, full width on ≤640px)
+
+--------------------------------------------------------------------------------
+D2. COMPANY 360° (tab: company-360)
+--------------------------------------------------------------------------------
+
+[NO MOBILE SPECIFIC CARDS — layout CSS only]
+
+Top: Same 5 quick action buttons as dashboard
+Then: DashboardTimeFilter — at mobile stacks vertical (.dashboard-time-filter flex-direction column)
+Then: DashboardKpiGrid — 2 columns at mobile (.dashboard-kpi-grid repeat(2, 1fr))
+Then: DashboardDraggableLayout — forced flex column, charts full width 100%
+  .chart-card, .metric-card: width 100%, min-height auto
+
+Charts remain full desktop chart components — not simplified or swipeable cards.
+No dedicated mobile chart carousel implemented.
+
+--------------------------------------------------------------------------------
+D3. CHART OF ACCOUNTS (tab: coa)
+--------------------------------------------------------------------------------
+
+[TABLE SCROLL] + [FORM STACK]
+
+Sub-tabs (desktop horizontal): Ledgers | Report Groups
+  NO MobileSubTabMenu wired — still horizontal scroll sub-tab-btn at mobile
+
+Content: COA tree/table, report groups panel — wide tables scroll horizontally
+Modals: CoaLedgerFormModal 600px, CoaAccountFormModal 620px — full width ≤640px
+
+--------------------------------------------------------------------------------
+D4. FINANCIAL STATEMENTS (tab: financials)
+--------------------------------------------------------------------------------
+
+[TABLE SCROLL for report tables] — special case subtabs KEPT horizontal
+
+Top: FinancialPeriodBar
+  At ≤768px: all rows stack vertical
+  FY select, preset pills (YTD/Q/H/custom) — pills horizontal scroll, min-height 44px
+  Date inputs: width 100%, font 16px, min-height 44px
+  OK button: full width, min-height 44px
+
+Sub-tabs: Trial Balance | P&L | Balance Sheet | Notes
+  .financial-subtabs — EXPLICITLY kept horizontal scroll on mobile (exception to subtab menu pattern)
+  Condensed/Detailed toggle for grouped views
+
+Toolbar: Sync GL, Export, Print — stack full width at ≤768px, min-height 44px
+
+GroupedReportTable: hierarchical rows, tap account → LedgerStatementModal
+Export/PDF modals: 420–800px → full width on phone
+
+--------------------------------------------------------------------------------
+D5. CUSTOMER MASTER (tab: customer-master)
+--------------------------------------------------------------------------------
+
+[CARDS] for registry list when not in add/edit form
+
+Header row: stacks vertical on mobile, buttons wrap 2 per row min-height 44px
+  "Add Customer" when form closed
+
+ADD/EDIT FORM (showAddForm true):
+  [FORM STACK] — multi-section form, all fields single column ≤768px
+  Sections: Identity, GST, Addresses, Accounting parameters
+  ~20+ fields: name, contact, email, phone, category, gst type, GSTIN, PAN,
+    billing/shipping address grids, opening balance, payment terms, credit limit
+  Buttons: Cancel + Register/Update — full width row
+
+REGISTRY (form closed):
+  Desktop: 10-column table HIDDEN (.desktop-only)
+  Mobile: MobileRegistryCards — one card per customer
+    Card shows: name (title), gst_type + state (meta), opening balance (amount right)
+    Rows: GSTIN monospace, Terms
+    Actions: Edit | Delete | Ledger (3 buttons, 50% width each min-height 40px)
+
+Party ledger: full-screen modal overlay (max-width 950px → scroll on phone)
+
+--------------------------------------------------------------------------------
+D6. VENDOR MASTER (tab: vendor-master)
+--------------------------------------------------------------------------------
+
+[TABLE SCROLL] — NO mobile cards implemented
+
+Same vendor form as desktop with [FORM STACK]
+Registry: full wide table with horizontal scroll
+  Columns: Vendor ID, Name, Email, Address, PAN, Opening Balance, Actions
+  Action buttons wrap in cell
+
+REASON NOT CARDS: Not added in implementation cycle; table scroll remains.
+
+--------------------------------------------------------------------------------
+D7. SALES / INVOICES (tab: sales)
+--------------------------------------------------------------------------------
+
+[CARDS] + [FILTER DRAWER] for registry
+Invoice line items: mobile card layout via CSS (all invoice/expense line item tables)
+
+Header (.table-header-row):
+  Title "Sales Registry"
+  Buttons (when form closed): Raise New Invoice | Export CSV | Export Excel
+  Mobile: buttons 2-per-row, min-height 44px
+
+REGISTRY VIEW:
+  Filter bar wrapped in MobileFilterShell:
+    Toggle button: "Invoice filters" + badge count (active filter fields)
+    Closed: filter fields hidden
+    Open: bottom sheet — filter grid 1 column, max-height 55vh
+      Fields: From Date, To Date, Search registry (invoice no, customer)
+    Sheet header fixed bottom: "Filters" title + Done button
+
+  Desktop table HIDDEN — 13+ columns (invoice #, type, client, dates, tax, status, actions)
+  Mobile cards per invoice:
+    Head: invoice # (monospace 15px) + customer + type | total amount teal 16px right
+    Rows: Issued date, Due date, Status badge
+    Actions: RegistryRowActions (Edit, View/PDF, Share, Delete, more for e-invoice/e-way)
+
+INVOICE FORM (showAddForm):
+  Top: Back to Registry button
+  Sections top to bottom:
+    1. Config bar (form-grid-3 → 1 col): Invoice type, Invoice #, Customer select + Add New Profile
+    2. Scanner card (OCR upload dropzone)
+    3. Dates, PO, addresses, place of supply, export fields, currency — form grids stack
+    4. LINE ITEMS (.invoice-items-scroll > .invoice-items-table):
+       MOBILE TRANSFORMATION (CSS only, no separate component):
+       - thead hidden
+       - Each tr.line-item-row → block card, padding 14px, border-radius 14px
+       - Each td shows data-label as uppercase 10px label via ::before
+       Fields per line card: Product, Description, HSN/SAC, Quantity, Rate, GST%, Supply, Tax preview, Remove
+       All inputs: width 100%, font 16px, min-height 44px
+    5. Add Item Row button
+    6. Calculations block (.invoice-calculations): subtotal, discount, CGST/SGST/IGST, grand total
+    7. Submit row: Cancel + Save
+
+Modals: InlineCustomer, InlineInventory, PdfPrintModal 800px, Einvoice, Eway — full width mobile
+
+--------------------------------------------------------------------------------
+D8. SALES RETURN / CREDIT NOTES (tab: sales-return)
+--------------------------------------------------------------------------------
+
+[TABLE SCROLL] — NO mobile registry cards
+
+Credit note form with line items — same mobile line item card CSS as invoices
+Registry table scrolls horizontally
+
+--------------------------------------------------------------------------------
+D9. RECEIPTS (tab: receipt)
+--------------------------------------------------------------------------------
+
+[SUBTAB MENU] MobileReceiptNav — vertical card picker
+Desktop horizontal sub-tabs HIDDEN (.desktop-subtabs)
+
+Sub-sections (select via mobile menu OR desktop tabs):
+  1. registry — Payment Registry — [TABLE SCROLL] wide table
+  2. dashboard — Collections Dashboard — metric cards grid
+  3. ageing — Debtor Ageing Analysis — [TABLE SCROLL]
+  4. forex — Forex Conversion — [TABLE SCROLL] + forms
+
+Receipt form: customer, amount, TDS, allocation grid — forms stack, allocation table scrolls
+Sub-toggle in form: Standard | Advance receipt mode (sub-tab-btn, scrolls with form)
+
+NO MobileFilterShell on receipts registry
+
+--------------------------------------------------------------------------------
+D10. DEBTORS (tab: debtors)
+--------------------------------------------------------------------------------
+
+[TABLE SCROLL]
+
+Sub-tabs (desktop only horizontal): Listing | Ageing
+  NO MobileSubTabMenu wired for DebtorsTab component
+
+Listing + ageing tables scroll horizontally
+
+--------------------------------------------------------------------------------
+D11. PURCHASE (tab: purchase)
+--------------------------------------------------------------------------------
+
+Same ExpenseTab component with purchaseMode=true
+[CARDS] + [FILTER DRAWER] for registry (shared with expense registry code path)
+
+Registry label: "Purchase Bills Registry"
+Filter shell title: "Purchase filters"
+Mobile cards: expense #, vendor, date, amount, status, Edit/Delete
+
+Purchase form: line items enabled by default — mobile line item cards apply
+
+--------------------------------------------------------------------------------
+D12. PURCHASE RETURN / DEBIT NOTES (tab: purchase-return)
+--------------------------------------------------------------------------------
+
+[TABLE SCROLL] — no mobile cards
+
+Debit note form + registry table
+
+--------------------------------------------------------------------------------
+D13. EXPENSES (tab: expense)
+--------------------------------------------------------------------------------
+
+[CARDS] + [FILTER DRAWER] (same code as purchase registry section)
+
+Filter title: "Expense filters"
+Cards: voucher #, vendor, date, expense head (if not purchase mode), payment status, Edit/Delete
+
+Expense form: optional line items — mobile card layout when line items enabled
+
+--------------------------------------------------------------------------------
+D14. PAYMENTS (tab: payment)
+--------------------------------------------------------------------------------
+
+[SUBTAB MENU] MobilePaymentNav
+
+Sub-sections:
+  1. registry — [TABLE SCROLL]
+  2. dashboard — metric cards
+  3. ageing — Creditors Ageing [TABLE SCROLL]
+  4. advance — Record Advance Payment form
+
+NO mobile cards for payment registry
+
+--------------------------------------------------------------------------------
+D15. CREDITORS (tab: creditors)
+--------------------------------------------------------------------------------
+
+[TABLE SCROLL]
+
+Sub-tabs Listing | Ageing — desktop horizontal only, no MobileSubTabMenu
+
+--------------------------------------------------------------------------------
+D16. CASH & BANK (tab: cash-bank)
+--------------------------------------------------------------------------------
+
+[TABLE SCROLL] + [FORM STACK]
+
+Sub-tabs: Cash | Bank (desktop horizontal, no mobile menu)
+Account list/cards + View Statement → LedgerStatementModal
+Modal: statement table scrolls, summary cards 1 column at ≤768px
+
+--------------------------------------------------------------------------------
+D17. INVENTORY (tab: inventory)
+--------------------------------------------------------------------------------
+
+[CARDS] for registry
+
+Header buttons: Add Item | Export CSV | Export Excel — 2-per-row mobile
+Add form: [FORM STACK] — type, name, SKU, HSN, UOM, prices, tax, stock fields
+
+Mobile cards per item:
+  Title: product name; meta: type + SKU; amount: selling price
+  Row: Stock quantity (red if low stock)
+  Actions: Edit + RecordDeleteButton
+
+--------------------------------------------------------------------------------
+D18. CONSUMPTION (tab: consumption)
+--------------------------------------------------------------------------------
+
+[NO MOBILE SPECIFIC]
+
+Header: title + Add button (stacks)
+Form: date, product, qty, expense head, reference — stacks
+Registry table: [TABLE SCROLL]
+
+--------------------------------------------------------------------------------
+D19. REGISTERS — LEDGERS (tab: ledgers)
+--------------------------------------------------------------------------------
+
+[TABLE SCROLL]
+
+FinancialPeriodBar (stacked mobile)
+Account dropdown select + Open Statement button (full width toolbar mobile)
+LedgerStatementModal on drill-down
+
+--------------------------------------------------------------------------------
+D20. REGISTERS — DAY BOOK (tab: day-book)
+--------------------------------------------------------------------------------
+
+[TABLE SCROLL] — chronological journal lines, many columns, horizontal scroll
+
+--------------------------------------------------------------------------------
+D21. REGISTERS — SALES REGISTER (tab: sales-register)
+--------------------------------------------------------------------------------
+
+[TABLE SCROLL] with column hiding at ≤768px:
+  .register-gst-table .col-gstin, .col-tax { display: none }
+Remaining columns still may require scroll
+
+--------------------------------------------------------------------------------
+D22. REGISTERS — PURCHASE REGISTER (tab: purchase-register)
+--------------------------------------------------------------------------------
+
+Same as sales register — GST columns hidden on mobile, table scroll
+
+--------------------------------------------------------------------------------
+D23. REGISTERS — MISC ENTRIES (tab: misc-entries)
+--------------------------------------------------------------------------------
+
+[TABLE SCROLL] + partial card UI
+
+Top: title + Refresh button (stacks)
+Guided action picker: grid auto-fill minmax(220px) — wraps on mobile to ~1-2 cols
+Active action form: form-grid-2 → 1 col, fields stack
+
+Manual journal table (.manual-journal-table):
+  At ≤768px: thead hidden, each tr → block card padding 12px (App.css mobile polish)
+  Inputs min-height 44px font 16px
+
+Recent journals table: [TABLE SCROLL]
+
+--------------------------------------------------------------------------------
+D24. TAXATION (tab: taxation)
+--------------------------------------------------------------------------------
+
+[SUBTAB MENU] MobileTaxationNav — 6 vertical section cards
+
+Desktop 6 horizontal sub-tabs HIDDEN
+
+Sections:
+  1. summary — GST Liability Ledger metrics + tables
+  2. gstr1 — GSTR-1 outward supplies — VERY WIDE [TABLE SCROLL]
+  3. gstr2b — GSTR-2B ITC — [TABLE SCROLL]
+  4. gstr3b — GSTR-3B — [TABLE SCROLL]
+  5. tds — TDS reports — [TABLE SCROLL]
+  6. compliance — ECRS logs — [TABLE SCROLL]
+
+Export button row remains at top of desktop sub-tab bar area
+TaxExportModal 520px → full width mobile
+
+NOTE: Mobile subtab menu shows all 6 sections but does NOT hide/show content —
+      both mobile menu AND content visible; user picks section via menu cards which
+      set taxReportSubTab state same as desktop buttons would.
+
+--------------------------------------------------------------------------------
+D25. SETTINGS (tab: settings)
+--------------------------------------------------------------------------------
+
+[SUBTAB MENU] MobileSettingsNav + stacked main nav
+
+Super admin: Company Settings | Website Settings main nav — stacks vertical, full width buttons min-height 48px
+
+MobileSettingsNav shows vertical cards for active main tab:
+
+Company tabs (role-filtered):
+  - Company Details (all)
+  - GST Compliance (admin)
+  - Manage Companies (super admin)
+  - User Management (admin)
+  - Financial Year Lock (admin)
+
+Website tabs (super admin only):
+  - Login & Audit Trail
+  - Data Backups
+  - System Health
+  - Subscriptions
+
+Desktop horizontal sub-tabs hidden (.desktop-subtabs)
+
+Each settings sub-section: large forms [FORM STACK], audit tables [TABLE SCROLL]
+Profile form ~18 fields, user mgmt tables, backup restore file input, etc.
+
+--------------------------------------------------------------------------------
+D26–27. AUTH / MARKETING (logged out)
+--------------------------------------------------------------------------------
+
+Not part of logged-in mobile shell. Marketing page has its own mkt-mobile-menu-btn drawer.
+Auth pages: centered card, reduced padding, align flex-start on small screens.
+
+
+================================================================================
+PART E — MODALS & OVERLAYS (MOBILE SIZING)
+================================================================================
+
+Standard Modal (.portal-modal-overlay): z-index 9999, padding 20px (safe-area at ≤640px)
+Card: width 100%, max-width per modal (420–800px), max-height 90vh, scroll inside
+At ≤640px: .portal-modal-card forced width 100% max-width 100%
+
+Tap backdrop closes (onClick on overlay)
+
+PdfPrintModal: maxWidth 800 → full screen scroll on phone
+Party ledger modals: max-width 950 → full width scroll
+
+Logout inactivity warning: centered card overlay (unchanged)
+
+DueReminderPopup: 480px modal on calendar due items
+
+
+================================================================================
+PART F — CHATGPT SUGGESTIONS vs IMPLEMENTATION MATRIX
+================================================================================
+
+| # | Your suggestion                    | Status      | What was implemented / alternative |
+|---|-------------------------------------|-------------|-------------------------------------|
+| 1 | Bottom Navigation                   | IMPLEMENTED | 5-tab bar: Home, Search, Create, Reports, Menu. Fixed bottom 64px+safe area. Home highlights active. Menu opens sidebar. |
+| 2 | Global Search                         | PARTIAL     | Full-screen client-side search over customers, vendors, invoices, expenses, purchases, receipts, payments, products, company GSTIN. NOT: ledgers, credit/debit notes, deep-link to record. Opens parent tab only. |
+| 3 | Floating Action Button (FAB)          | IMPLEMENTED | 56px circle bottom-right + 7-item create menu. Bottom nav "Create" duplicates FAB open. Does NOT auto-open add forms. |
+| 4 | Mobile Dashboard Redesign             | IMPLEMENTED | CSS flex order: Quick Actions → Recent → Attention → KPIs → Compliance → Activity. Was compliance-first before. |
+| 5 | Registry Tables → Mobile Cards        | PARTIAL     | CARDS: Sales invoices, Customers, Expenses/Purchases, Inventory. NOT CARDS: Vendors, Receipts, Payments, Credit/Debit notes, Consumption, all Registers, Taxation GSTR tables, Settings audit tables, Debtors/Creditors. Those remain horizontal scroll tables. |
+| 6 | Invoice Entry Mobile Experience       | IMPLEMENTED | Line items via CSS card transformation + data-label attributes on LineItemTaxRow. Applies to sales invoice + purchase/expense line items. Full invoice form still long scroll — not wizard/stepper. |
+| 7 | Company 360 Mobile Optimization       | PARTIAL     | Charts stack vertical, KPI 2-col grid, time filter stacks. NOT: swipeable chart cards, simplified chart data, reduced chart density logic. |
+| 8 | Settings Mobile Experience            | IMPLEMENTED | MobileSettingsNav vertical cards for sub-tabs; main nav stacks. Desktop horizontal sub-tabs hidden. Content/forms unchanged inside sections. |
+| 9 | Header Simplification                 | IMPLEMENTED | Removed top hamburger; 2-row grid; hide user name/clock/Portal suffix; bell + avatar + logout + company select. |
+| 10| Universal Mobile Filters              | PARTIAL     | MobileFilterShell on Sales invoice registry + Expense/Purchase registry only. NOT on: Receipts, Payments, Taxation, Registers, Customer list (no filters). |
+| 11| Recent Activity & Recent Records      | IMPLEMENTED | MobileRecentStrip on dashboard + search "Recent" section + localStorage vouchex.mobile.recent (max 12). Tracks tabs and search selections. |
+| 12| Mobile Gestures                       | NOT DONE    | No swipe-to-delete, swipe-between-tabs, pull-to-refresh. Only :active scale(0.985) on registry cards as touch feedback. |
+| 13| Premium Loading Experience            | PARTIAL     | .mobile-tab-loading shimmer on top bar + skeleton pulse. Tab switch still uses existing SkeletonLoader component. No optimistic UI. |
+| 14| Mobile Notifications Center           | IMPLEMENTED | Header bell + right drawer. Uses dashboard attention items + calendar due + trial warning. NOT push notifications or server-sent alerts. |
+| 15| PWA Readiness                         | PARTIAL     | Updated manifest (standalone, portrait, shortcuts, maskable icons), Apple meta tags, theme-color. NO service worker, NO offline cache, NO install prompt UI, NO app shell routing. |
+
+Additional fixes from BEFORE this transformation (still active):
+  - Sidebar position:fixed off-canvas (fixed CSS cascade bug that shifted content right)
+  - nav-scroll-lock on html when sidebar open
+  - Financial period bar / register / misc entries mobile polish in App.css ≤768px
+  - Console drawer / simulator bar hidden on mobile
+
+
+================================================================================
+PART G — REASONS FOR NON-IMPLEMENTATION (FOR CHATGPT CONTEXT)
+================================================================================
+
+1. REGISTRY CARDS NOT EVERYWHERE
+   Reason: Scope/time — each registry needs custom card renderCard JSX. Only highest-traffic registries done first (sales, customers, expenses, inventory).
+   Alternative: premium-table-wrapper horizontal scroll + touch scrolling.
+
+2. GLOBAL SEARCH NO LEDGERS / NO DEEP LINKS
+   Reason: Ledger accounts require API call (glLedgerAccounts); search is client-side in-memory only for speed/zero backend changes. Deep-link would need URL routing or tab state params not in current SPA architecture (tabs are useState only, no URL paths).
+
+3. FAB DOES NOT OPEN ADD FORM DIRECTLY
+   Reason: Each tab manages its own showAddForm state internally in App.jsx subcomponents; no global form-open API. FAB only calls navigateTab(tabId).
+
+4. NO SWIPE GESTURES
+   Reason: Zero paid libraries rule — native touch handlers would need careful conflict with scroll. Deferred.
+
+5. NO SERVICE WORKER / FULL PWA
+   Reason: Risk to cPanel deployment and cache invalidation on accounting app; manifest-only prep for future Objective 3 (native/PWA app).
+
+6. COMPANY 360 CHARTS NOT REDESIGNED
+   Reason: Charts use existing Recharts/draggable grid; mobile CSS stacking deemed sufficient for v1.
+
+7. DEBTORS/CREDITORS/CASH-BANK NO SUBTAB MOBILE MENU
+   Reason: Only 2 sub-tabs each — horizontal scroll still usable; MobileSubTabMenu wired only where 4–6 sub-tabs (Receipts, Payments, Taxation, Settings).
+
+8. COA / FINANCIALS SUBTABS STILL HORIZONTAL
+   Reason: Financial subtabs explicitly exempted in mobile.css (.financial-subtabs { display:flex }) because vertical menu + horizontal pills was judged OK for 4 TB/P&L/BS/Notes switches.
+
+9. TAXATION CONTENT STILL TABLE-HEAVY
+   Reason: GSTR tables have 10+ columns; hiding GSTIN/tax cols in registers but not in taxation tab. Major effort to card-ify GSTR rows.
+
+10. DESKTOP 100% UNCHANGED RULE
+    Reason: All mobile features gated behind max-width 1024px and .mobile-only/.desktop-only classes — constrained some shared-component refactors.
+
+
+================================================================================
+PART H — FILE REFERENCE (FOR CHATGPT IF SUGGESTING CODE CHANGES)
+================================================================================
+
+Mobile-specific new files:
+  frontend/src/styles/mobile.css                    — all premium mobile CSS
+  frontend/src/hooks/useMediaQuery.js
+  frontend/src/hooks/useRecentRecords.js
+  frontend/src/utils/buildGlobalSearchIndex.js
+  frontend/src/utils/mobileNotifications.js
+  frontend/src/components/mobile/MobileBottomNav.jsx
+  frontend/src/components/mobile/MobileFab.jsx
+  frontend/src/components/mobile/MobileGlobalSearch.jsx
+  frontend/src/components/mobile/MobileNotificationsPanel.jsx
+  frontend/src/components/mobile/MobileReportsSheet.jsx
+  frontend/src/components/mobile/MobilePortalShell.jsx
+  frontend/src/components/mobile/MobileRegistryCards.jsx
+  frontend/src/components/mobile/MobileFilterShell.jsx
+  frontend/src/components/mobile/MobileSubTabMenu.jsx
+  frontend/src/components/mobile/MobileModuleNav.jsx
+  frontend/src/components/mobile/MobileRecentStrip.jsx
+
+Modified integration:
+  frontend/src/App.jsx — shell, cards, filters, subtab menus
+  frontend/src/main.jsx — imports mobile.css
+  frontend/src/components/portalShared.jsx — LineItemTaxRow data-label attrs
+  frontend/public/site.webmanifest — PWA manifest
+  frontend/index.html — Apple PWA meta tags
+
+
+================================================================================
+PART I — WHAT TO ASK CHATGPT TO DO NEXT
+================================================================================
+
+Given this POST-implementation state, please provide:
+
+1. Priority-ranked list of NEXT mobile improvements (max 15) with effort estimate (S/M/L)
+
+2. For each registry still on [TABLE SCROLL], recommend card layout field priority
+   (which 4–5 fields to show on card vs "View more")
+
+3. Should FAB/bottom Create navigate with query param or global context to auto-open
+   add forms? Best pattern for this React SPA without URL router?
+
+4. Is horizontal scroll acceptable for GSTR-1/2B/3B on mobile or mandatory card migration?
+
+5. Service worker strategy for accounting SaaS (cache busting on deploy) — worth it now?
+
+6. Any UX conflicts you see (e.g. FAB + bottom nav both covering content, duplicate Create)
+
+7. Accessibility audit: touch targets, focus trap in overlays, screen reader order
+
+8. One-handed thumb zone analysis for bottom nav vs FAB placement
+
+9. Should Financial Statements sub-tabs move to vertical MobileSubTabMenu like Settings?
+
+10. Overall verdict: Is this now "premium mobile accounting SaaS v1" or still "desktop
+    squeezed"? What single change would most improve perception?
+
+================================================================================
+END OF DOCUMENT
+================================================================================

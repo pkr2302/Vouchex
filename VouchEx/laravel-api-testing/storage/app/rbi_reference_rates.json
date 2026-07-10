@@ -1,0 +1,23 @@
+{
+  "updated_at": "2026-05-23",
+  "rates": {
+    "USD": 83.50,
+    "EUR": 90.25,
+    "GBP": 105.80,
+    "JPY": 0.56,
+    "AUD": 55.20,
+    "CAD": 60.85,
+    "CHF": 93.40,
+    "SGD": 62.10,
+    "HKD": 10.68,
+    "SAR": 22.25,
+    "CNY": 11.55,
+    "NZD": 51.30,
+    "SEK": 7.85,
+    "DKK": 12.10,
+    "NOK": 7.75,
+    "KWD": 272.50,
+    "BHD": 221.80
+  },
+  "note": "Fallback snapshot when live RBI fetch is unavailable. Run: php artisan rbi:sync-rates"
+}

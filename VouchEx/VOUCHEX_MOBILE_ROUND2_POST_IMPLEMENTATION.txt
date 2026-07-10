@@ -1,0 +1,443 @@
+================================================================================
+VOUCHEX — MOBILE ROUND 2 POST-IMPLEMENTATION (FOR CHATGPT REVIEW)
+Version: After ChatGPT Round 2 + User Bug Fixes (June 2026)
+Production: https://vouchex.kuhu.org.in
+Build assets: index-CJyLDT-p.css, index-JR0x80h6.js
+Prior doc: VOUCHEX_MOBILE_STRUCTURE_POST_IMPLEMENTATION.txt (Round 1 baseline)
+================================================================================
+
+PURPOSE
+-------
+ChatGPT reviewed Round 1 mobile work and scored it 8.7/10. It gave 6 priority
+fixes + optional improvements. The user also reported 3 bugs. This document
+describes EXACTLY what was implemented in Round 2, what remains incomplete,
+known limitations, and current mobile behavior — so ChatGPT can score again and
+suggest the path to 10/10 without breaking desktop (>1024px).
+
+Constraints unchanged:
+- React 19 + Vite SPA, Laravel 11 API
+- Mobile gated by max-width 1024px, .mobile-only / .desktop-only
+- No paid libraries, no service worker
+- Desktop layout must remain 100% unchanged above 1024px
+
+
+================================================================================
+PART A — CHATGPT ROUND 2 REQUESTS (ORIGINAL 6 PRIORITIES)
+================================================================================
+
+Priority #1  Vendor Master → mobile cards (match Customer Master)
+Priority #2  Receipts Registry → mobile cards
+Priority #3  Payments Registry → mobile cards
+Priority #4  Debtors & Creditors → mobile cards
+Priority #5  FAB should open add forms directly (not tab-only)
+Priority #6  Global search: ledgers, credit/debit notes, journals + command palette
+
+Also recommended (not in top 6 but mentioned):
+- Bottom nav Create → GST (remove duplicate with FAB)
+- Taxation: mobile summary layer before GSTR tables (not full cardify)
+- Do NOT add service worker
+- Do NOT cardify Financial Statements
+- Do NOT cardify full GSTR row data
+
+
+================================================================================
+PART B — USER'S 3 REPORTED BUGS (ORIGINAL)
+================================================================================
+
+Bug #1  Header: company name cut off on right; logout button not visible.
+        Suggestion: remove date/time on mobile (phone status bar already shows it).
+
+Bug #2  Some pages clip right-side content and don't scroll horizontally —
+        e.g. Settings → Company Details logo/buttons cut off.
+
+Bug #3  Android hardware back button exits site immediately on first press.
+        Expected: back closes overlay → previous tab → confirm leave → then exit.
+
+
+================================================================================
+PART C — IMPLEMENTATION STATUS MAP
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CHATGPT PRIORITY          │ STATUS      │ NOTES                            │
+├───────────────────────────┼─────────────┼──────────────────────────────────┤
+│ #1 Vendor cards           │ ✅ DONE     │ desktop-only table + cards       │
+│ #2 Receipt cards          │ ✅ DONE     │ registry list only               │
+│ #3 Payment cards          │ ✅ DONE     │ outflow registry only            │
+│ #4 Debtors/Creditors      │ ✅ DONE     │ party listing sub-view           │
+│ #5 FAB direct forms       │ ✅ DONE     │ portalFormIntent pattern         │
+│ #6 Search + palette       │ ✅ DONE     │ partial deep-link (tab only)     │
+│ Bottom Create → GST       │ ✅ DONE     │ FAB is sole create entry         │
+│ GSTR-1 summary layer      │ ✅ DONE     │ GSTR-1 only; toggle detail table │
+│ No service worker         │ ✅ KEPT     │ manifest-only PWA unchanged      │
+│ Financial Statements      │ ✅ UNTOUCHED│ horizontal scroll kept           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ USER BUG                  │ STATUS      │ NOTES                            │
+├───────────────────────────┼─────────────┼──────────────────────────────────┤
+│ #1 Header / logout        │ ✅ DONE     │ clock hidden mobile; logout 40px │
+│ #2 Horizontal clip        │ ⚠️ PARTIAL  │ global overflow-x clip + stack   │
+│ #3 Android back           │ ✅ DONE     │ popstate stack + confirm leave   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+PART D — TECHNICAL IMPLEMENTATION DETAIL (ROUND 2)
+================================================================================
+
+D1. REGISTRY CARDS ADDED (mobile ≤1024px)
+-----------------------------------------
+Pattern everywhere:
+  - Wrap existing table: .premium-table-wrapper.desktop-only
+  - Add <MobileRegistryCards items={...} renderCard={...} /> below
+
+Locations:
+
+  VENDOR MASTER (App.jsx, ExpenseTab vendorMasterOnly block)
+    Card shows: name, category/gst type, opening balance, GSTIN, email
+    Actions: Edit, Delete, Ledger
+
+  RECEIPTS REGISTRY (App.jsx, ReceiptTab receiptSubTab === 'registry')
+    Card shows: receipt_number, customer_name, amount, date, mode, status
+    Actions: RegistryRowActions (edit/view/share/delete)
+    NOTE: Pending debtor invoices table inside registry still TABLE SCROLL
+
+  PAYMENTS REGISTRY (App.jsx, PaymentTab paymentSubTab === 'registry')
+    Card shows: payment_number, payee, amount, date, voucher type
+    Actions: RegistryRowActions
+    NOTE: Pending creditor bills table still TABLE SCROLL
+
+  DEBTORS (DebtorsTab.jsx, subView === 'listing')
+    Card shows: customer name, outstanding ₹, days since last invoice
+    Badge: Clear / Due / Overdue (>30 days heuristic)
+    Action: View details
+    NOTE: Party detail drill-down still uses tables
+
+  CREDITORS (CreditorsTab.jsx, subView === 'listing')
+    Same pattern as Debtors for vendors
+
+Round 1 cards still present (unchanged):
+  Sales invoices, Customer master, Expenses/Purchases registry, Inventory
+
+
+D2. FAB DIRECT FORM OPENING
+---------------------------
+New utility: frontend/src/utils/portalFormIntent.js
+  - queuePortalFormIntent(tabId, 'add')
+  - consumePortalFormIntent(tabId) — one-shot on tab mount
+
+New hook: frontend/src/hooks/usePortalFormIntent.js
+  - useEffect on tab mount consumes intent and runs handler
+
+App.jsx navigateTab extended:
+  navigateTab(tabId, { openForm: 'add' }) → queues intent then sets activeTab
+
+MobileFab.jsx:
+  onNavigate(action.tab, { openForm: 'add' })
+
+Tabs wired with usePortalFormIntent:
+  - sales → setShowAddForm(true) on SalesInvoicesSubTab
+  - customer-master → setShowAddForm(true)
+  - vendor-master / purchase / expense → vendor form OR expense form
+  - receipt → setShowAddForm(true), receiptSubTab registry
+  - payment → setShowRecordPayment(true)
+
+Limitation: Does NOT pre-fill or deep-link to a specific record from search.
+Search still navigates to tab only.
+
+
+D3. GLOBAL SEARCH + COMMAND PALETTE
+-----------------------------------
+buildGlobalSearchIndex.js expanded:
+  - creditNotes (type: credit_note → tab sales-return)
+  - debitNotes (type: debit_note → tab purchase-return)
+  - coaChart ledgers (type: ledger → tab coa)
+  - journals from API glGuidedJournals (type: journal → tab day-book)
+  - QUICK_DESTINATIONS (13 pages: Dashboard, Customers, Vendors, Sales,
+    Receipts, Payments, Ledgers, Day Book, Debtors, Creditors, GST,
+    Financials, Settings)
+
+MobileGlobalSearch.jsx:
+  - "Quick jump" section when query empty (Compass icon)
+  - Fetches journals when overlay opens (portalApi.glGuidedJournals)
+  - Placeholder: "Search records, ledgers, pages…"
+
+MobilePortalShell searchData now includes:
+  creditNotes, debitNotes, coaChart from SimulatorContext
+
+Limitation:
+  - No URL routing; tab state is React useState only
+  - Selecting a search result opens the TAB, not the specific row/form
+  - Ledger groups (report groups) not indexed separately — ledger names only
+
+
+D4. BOTTOM NAV: CREATE → GST
+----------------------------
+MobileBottomNav.jsx tabs now:
+  Home | Search | GST | Reports | Menu
+
+  - GST tab → navigateTab('taxation')
+  - Create action removed from bottom nav
+  - FAB remains the only create entry (7 actions)
+
+
+D5. GSTR-1 MOBILE SUMMARY LAYER
+--------------------------------
+New: frontend/src/components/mobile/MobileGstrSummary.jsx
+
+TaxationTab when taxReportSubTab === 'gstr1':
+  - Shows summary card: invoice count, taxable value, total GST
+  - Button: "View detailed table" / "Hide detailed table"
+  - Full GSTR-1 tables wrapped in .gstr1-detail-block (hidden until toggle)
+
+CSS (mobile.css):
+  - .mobile-gstr-summary styled card grid
+  - .gstr1-detail-block hidden by default on mobile; --open shows tables
+
+NOT done for GSTR-2B, GSTR-3B, GST summary tab — still table-first.
+
+
+D6. HEADER FIX (USER BUG #1)
+----------------------------
+App.jsx:
+  HeaderClock wrapped in <span className="desktop-only">
+
+mobile.css (≤1024px):
+  - .header-clock { display: none }
+  - .page-title-portal { display: none }
+  - .page-title first span: ellipsis overflow
+  - .header-company-select max-width min(120px, 28vw)
+  - .logout-btn: 40×40px, flex-shrink 0, always visible
+  - .user-info hidden (avatar only)
+
+
+D7. HORIZONTAL OVERFLOW FIX (USER BUG #2)
+-----------------------------------------
+mobile.css additions:
+  - overflow-x: clip on html, body, #root, .main-content, .tab-container,
+    .master-form, .table-card
+  - .form-grid-2/3/4 → 1 column on mobile
+  - Settings profile 2-column grid (inline style gridTemplateColumns 1.2fr 0.8fr)
+    forced to flex column stack via attribute selector
+  - .premium-table-wrapper (non desktop-only): overflow-x auto inside wrapper
+
+Known remaining clip risk:
+  - Inline style grids outside .master-form may still overflow
+  - Modals with fixed widths
+  - Company 360 draggable chart grid
+  - COA / Registers wide tables (intentional inner scroll)
+
+
+D8. ANDROID BACK BUTTON (USER BUG #3)
+--------------------------------------
+New: frontend/src/hooks/useMobileBackNavigation.js
+
+Lifted overlay state to App.jsx (was inside MobilePortalShell):
+  searchOpen, reportsOpen, fabOpen (+ existing notificationsOpen, sidebarOpen)
+
+Behavior on popstate (mobile only):
+  1. Close overlay priority: notifications → search → reports → FAB → sidebar
+  2. Else pop tab stack → navigateTab(previous, { fromBack: true })
+  3. At root tab: window.confirm("Leave VouchEx?...")
+     - OK → history.back() (exit)
+     - Cancel → pushState guard (stay)
+
+Uses history.pushState on tab change to build stack.
+
+Limitation:
+  - Does not handle in-tab form back (e.g. close add form on back)
+  - Does not handle Debtors party drill-down back
+  - confirm() is browser native dialog (not branded sheet)
+
+
+================================================================================
+PART E — CURRENT MOBILE REGISTRY COVERAGE (ROUND 1 + ROUND 2 COMBINED)
+================================================================================
+
+REGistries WITH mobile cards (≤1024px):
+  ✅ Sales invoices
+  ✅ Customer master
+  ✅ Vendor master
+  ✅ Expense registry
+  ✅ Purchase registry
+  ✅ Inventory
+  ✅ Receipts (registered vouchers list)
+  ✅ Payments (outflow registry)
+  ✅ Debtors party listing
+  ✅ Creditors party listing
+
+REGistries STILL TABLE SCROLL on mobile:
+  ❌ Credit notes registry (sales-return tab)
+  ❌ Debit notes registry (purchase-return tab)
+  ❌ Receipt tab: pending debtor invoices table
+  ❌ Payment tab: pending creditor bills table
+  ❌ Sales register / Purchase register / Day book / Ledger register tabs
+  ❌ Cash & Bank tab
+  ❌ Chart of Accounts ledger list
+  ❌ Settings: user mgmt, audit logs, company list (super admin)
+  ❌ Taxation: GSTR-2B, GSTR-3B, TDS, compliance tables
+  ❌ Guided actions / manual journal recent list
+  ❌ Consumption tab
+
+This is likely why user feels "not 10/10 yet" — inconsistency remains on
+secondary/high-volume screens.
+
+
+================================================================================
+PART F — MOBILE SHELL STATE (AFTER ROUND 2)
+================================================================================
+
+Bottom nav (5 tabs):
+  Home → dashboard
+  Search → opens MobileGlobalSearch overlay (not a tab route)
+  GST → taxation tab
+  Reports → MobileReportsSheet overlay
+  Menu → sidebar drawer toggle
+
+FAB (bottom-right, 56px):
+  7 create actions → navigate + openForm intent
+  Backdrop z-index below FAB, above content
+
+Overlays (z-index ~1200):
+  Search, Notifications, Reports sheet, Filter sheets (sales/expense)
+
+Header mobile layout:
+  Row1: [Page title ellipsis] [Bell] [Company select if super admin] [Avatar] [Logout]
+  Row2: Trial banner if active
+  NO clock, NO "Portal" subtitle
+
+
+================================================================================
+PART G — NEW & MODIFIED FILES (ROUND 2 ONLY)
+================================================================================
+
+NEW FILES:
+  frontend/src/utils/portalFormIntent.js
+  frontend/src/hooks/usePortalFormIntent.js
+  frontend/src/hooks/useMobileBackNavigation.js
+  frontend/src/components/mobile/MobileGstrSummary.jsx
+
+MODIFIED FILES:
+  frontend/src/App.jsx
+    - navigateTab + openForm intent
+    - useMobileBackNavigation integration
+    - overlay state lifted for back nav
+    - HeaderClock desktop-only wrapper
+    - Vendor/Receipt/Payment registry cards
+    - GSTR-1 summary + detail toggle
+    - usePortalFormIntent on sales, customer, expense, receipt, payment tabs
+
+  frontend/src/components/DebtorsTab.jsx — mobile cards on listing
+  frontend/src/components/CreditorsTab.jsx — mobile cards on listing
+
+  frontend/src/components/mobile/MobileBottomNav.jsx — Create → GST
+  frontend/src/components/mobile/MobileFab.jsx — openForm on action
+  frontend/src/components/mobile/MobilePortalShell.jsx — search data expanded,
+    overlay props from parent
+  frontend/src/components/mobile/MobileGlobalSearch.jsx — quick jump + journals
+
+  frontend/src/utils/buildGlobalSearchIndex.js — full expansion
+  frontend/src/styles/mobile.css — header, overflow, GSTR summary, badges
+
+BUILD OUTPUT (deploy these 3 files only to production public/):
+  laravel-api/public/index.html
+  laravel-api/public/assets/index-CJyLDT-p.css
+  laravel-api/public/assets/index-JR0x80h6.js
+
+Delete old index-*.js and index-*.css from server /public/assets/ after upload.
+
+
+================================================================================
+PART H — KNOWN GAPS / WHY NOT 10/10 YET (FOR CHATGPT)
+================================================================================
+
+1. REGISTRY INCONSISTENCY (biggest remaining issue)
+   Credit notes, debit notes, registers, COA, cash-bank still horizontal tables.
+   User psychologically hits "desktop page" on these screens.
+
+2. SEARCH NOT TRUE DEEP LINK
+   Finds record but only opens parent tab — cannot scroll/highlight/open that row.
+
+3. FAB / BACK NOT FORM-AWARE
+   Hardware back does not close an open add form inside a tab.
+   User may expect back to exit invoice form before exiting tab.
+
+4. RECEIPT/PAYMENT SUB-TABLES
+   Pending invoices / pending bills still full-width tables inside cardified pages.
+
+5. GSTR MOBILE SUMMARY ONLY ON GSTR-1
+   GSTR-2B/3B still dump full tables immediately — no summary-first pattern.
+
+6. OVERFLOW FIX IS GLOBAL CLIP
+   overflow-x: clip prevents page bleed but some edge pages may still feel tight;
+   not all inline grid layouts converted to responsive classes.
+
+7. DEBTORS OVERDUE HEURISTIC
+   Uses >30 days since last invoice — not true ageing bucket from API on cards.
+
+8. NO SWIPE GESTURES / NO NATIVE APP FEEL
+   Still browser SPA; no pull-to-refresh, no haptic, no shared element transitions.
+
+9. COMMAND PALETTE INCOMPLETE
+   Quick jump is tab-level only — no "Record receipt", "Raise invoice" shortcuts
+   in palette (FAB handles create but not searchable by voice-of-command).
+
+10. PARTY DRILL-DOWN STILL TABLE-HEAVY
+    Debtors/Creditors "View details" opens nested tables not cards.
+
+
+================================================================================
+PART I — SCORING CONTEXT FOR CHATGPT
+================================================================================
+
+Round 1 ChatGPT score: 8.7/10 ("Premium Mobile SaaS V1")
+
+Round 2 addressed the single biggest Round 1 weakness (registry inconsistency on
+Vendor/Receipt/Payment/Debtors/Creditors) plus FAB UX and search expansion.
+
+Suggested questions for ChatGPT re-review:
+
+1. Updated score after Round 2? What is the single highest-ROI item for 10/10?
+
+2. Should Round 3 prioritize:
+   (a) Credit/Debit note cards
+   (b) Register tabs cards
+   (c) Search deep-link to record
+   (d) Back button closes in-tab forms first
+   (e) GSTR-2B/3B summary layers
+
+3. Is global overflow-x: clip acceptable or should we refactor inline grids?
+
+4. For accounting apps, is confirm() on leave OK or need custom modal?
+
+5. Should bottom nav add "Clients" tab (Debtors shortcut) instead of only GST?
+
+6. Any UX conflict remaining between FAB + bottom nav + sticky header?
+
+7. Verdict: Still "premium mobile SaaS" or approaching "native-quality"?
+
+
+================================================================================
+PART J — QUICK TEST CHECKLIST (POST-DEPLOY)
+================================================================================
+
+Mobile width ≤1024px, hard refresh after deploy:
+
+[ ] Header: no clock, logout visible, title not clipped badly
+[ ] FAB → Sales Invoice opens add form directly (not just sales tab)
+[ ] Vendor master shows cards not horizontal scroll
+[ ] Receipts registry cards visible
+[ ] Payments registry cards visible
+[ ] Debtors/Creditors listing cards with overdue badge
+[ ] Search empty → Quick jump list visible
+[ ] Search "GSTIN" or ledger name → finds ledgers
+[ ] Bottom nav has GST not Create
+[ ] GSTR-1 shows summary card before table toggle
+[ ] Android back: closes search first, then previous tab, then leave confirm
+[ ] Settings company profile: logo buttons not clipped off-screen
+
+
+================================================================================
+END OF DOCUMENT — Share this entire file with ChatGPT for Round 3 review
+================================================================================
