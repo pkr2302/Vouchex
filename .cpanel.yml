@@ -1,14 +1,4 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/kuhuorgi/vouchex/
-    - /bin/cp -R VouchEx/laravel-api/app $DEPLOYPATH
-    - /bin/cp -R VouchEx/laravel-api/bootstrap $DEPLOYPATH
-    - /bin/cp -R VouchEx/laravel-api/config $DEPLOYPATH
-    - /bin/cp -R VouchEx/laravel-api/database $DEPLOYPATH
-    - /bin/cp -R VouchEx/laravel-api/public $DEPLOYPATH
-    - /bin/cp -R VouchEx/laravel-api/resources $DEPLOYPATH
-    - /bin/cp -R VouchEx/laravel-api/routes $DEPLOYPATH
-    - /bin/cp VouchEx/laravel-api/artisan $DEPLOYPATH
-    - /bin/cp VouchEx/laravel-api/composer.json $DEPLOYPATH
-    - /bin/cp VouchEx/laravel-api/composer.lock $DEPLOYPATH
+    - echo "cPanel Deploy is disabled. Use GitHub Actions FTP deploy instead."
