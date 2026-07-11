@@ -148,9 +148,11 @@ export const SimulatorProvider = ({ children }) => {
 
   const resolveCompanyContext = useCallback((user, companyList) => {
     setCompanies(companyList || []);
-    if (!companyList?.length) {
-      setActiveCompany(null);
-      setActiveCompanyId(null);
+    if (!user || !companyList?.length) {
+      if (!companyList?.length) {
+        setActiveCompany(null);
+        setActiveCompanyId(null);
+      }
       return null;
     }
 
@@ -242,6 +244,19 @@ export const SimulatorProvider = ({ children }) => {
       await refreshCompaniesList().catch(() => {});
       addConsoleLog('route', 'GET /api/portal/bootstrap', 'PortalDataController@bootstrap — MySQL snapshot loaded.');
     } catch (err) {
+      const subscriptionBlocked =
+        err?.status === 402 || err?.data?.type === 'subscription_required';
+      if (subscriptionBlocked) {
+        if (err?.data?.account) {
+          setAccount(err.data.account);
+        }
+        addConsoleLog(
+          'system',
+          'Portal bootstrap skipped — subscription required.',
+          'Show subscription page instead of error dialog.'
+        );
+        return;
+      }
       addConsoleLog('system', `Bootstrap sync failed: ${err.message}`, 'Check laravel-api .env DB_* and CORS FRONTEND_URL.');
       showApiError('Loading portal data', err);
       throw err;
@@ -291,12 +306,22 @@ export const SimulatorProvider = ({ children }) => {
   useEffect(() => {
     if (!apiReady || !getStoredToken()) return undefined;
     portalApi.me()
-      .then((res) => {
-        setCurrentUser(res.user);
+      .then(async (res) => {
+        const user = res.user || (res.id && res.email ? res : null);
+        if (!user) {
+          setStoredToken(null);
+          return;
+        }
+        setCurrentUser(user);
         setAccount(res.account ?? null);
         setNeedsPassword(!!res.needs_password);
-        resolveCompanyContext(res.user, res.companies || []);
-        return refreshPortalData();
+        resolveCompanyContext(user, res.companies || []);
+        const needsSub =
+          res.account?.needs_subscription === true
+          || res.account?.has_portal_access === false;
+        if (!needsSub) {
+          await refreshPortalData();
+        }
       })
       .catch(() => {
         setStoredToken(null);
@@ -306,6 +331,7 @@ export const SimulatorProvider = ({ children }) => {
 
   useEffect(() => {
     if (!apiReady || !currentUser) return undefined;
+    if (account?.needs_subscription || account?.has_portal_access === false) return undefined;
 
     const poll = async () => {
       try {
@@ -332,7 +358,7 @@ export const SimulatorProvider = ({ children }) => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [apiReady, currentUser, refreshPortalData, addConsoleLog]);
+  }, [apiReady, currentUser, account, refreshPortalData, addConsoleLog]);
 
   const applyAuthSession = (res) => {
     if (res.token) setStoredToken(res.token);
@@ -344,11 +370,12 @@ export const SimulatorProvider = ({ children }) => {
 
   const refreshAccount = async () => {
     const res = await portalApi.me();
-    setCurrentUser(res.user);
+    const user = res.user || (res.id && res.email ? res : null);
+    setCurrentUser(user);
     setAccount(res.account ?? null);
     setNeedsPassword(!!res.needs_password);
-    if (res.user) resolveCompanyContext(res.user, res.companies || []);
-    return res;
+    if (user) resolveCompanyContext(user, res.companies || []);
+    return { ...res, user };
   };
 
   const loginUser = async (email, password) => {
@@ -363,10 +390,15 @@ export const SimulatorProvider = ({ children }) => {
         const chosen = match || companyList[0];
         setActiveCompanyId(chosen.id);
       }
-      try {
-        await refreshPortalData();
-      } catch (err) {
-        addConsoleLog('system', `Bootstrap failed after login: ${err.message}`, 'You are logged in; API data sync pending.');
+      const needsSub =
+        res.account?.needs_subscription === true
+        || res.account?.has_portal_access === false;
+      if (!needsSub) {
+        try {
+          await refreshPortalData();
+        } catch (err) {
+          addConsoleLog('system', `Bootstrap failed after login: ${err.message}`, 'You are logged in; API data sync pending.');
+        }
       }
       addConsoleLog('route', `POST /api/auth/login [Role: ${res.user.role}]`, "Route::post('/api/auth/login', [AuthController::class, 'login']);");
       return { success: true, user: res.user };

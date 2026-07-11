@@ -23,8 +23,26 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->validateCsrfTokens(except: ['api/*']);
+        $middleware->redirectGuestsTo(function (Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return null;
+            }
+
+            return '/';
+        });
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Unauthenticated.',
+                    'type' => 'unauthenticated',
+                ], 401);
+            }
+
+            return null;
+        });
+
         $exceptions->render(function (\Throwable $e, Request $request) {
             if (! $request->is('api/*')) {
                 return null;

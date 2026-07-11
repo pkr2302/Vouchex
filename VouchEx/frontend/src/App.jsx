@@ -430,7 +430,7 @@ function App() {
         setSubscriptionMeta({
           plans: publicConfig?.plans || res.plans,
           payment: publicConfig?.payment || res.payment,
-          pending: res.pending_payment || null,
+          pending: res.pending ?? res.pending_payment ?? null,
         });
       } catch {
         if (!cancelled) {

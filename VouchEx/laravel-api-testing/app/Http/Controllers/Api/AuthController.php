@@ -159,7 +159,7 @@ class AuthController extends Controller
         $company = $user->company_id ? Company::find($user->company_id) : null;
 
         return response()->json([
-            ...$this->userPayload($user),
+            'user' => $this->userPayload($user),
             'companies' => $this->companiesForUser($user),
             'account' => $this->subscriptions->accountPayload($user, $company),
             'needs_password' => $user->auth_provider === 'google' && ! $user->password_set,
