@@ -56,7 +56,7 @@ import {
   inventoryProduct,
 } from './utils/gstUtils';
 import { INVENTORY_UNIT_BASE_OPTIONS } from './data/inventoryUnits';
-import { formatINR, sumField, toAmount, sameId, formatDateDDMMYYYY, nextDocumentNumber, sortRegistryNewestFirst, dateOnly, parseDateOnlyLocal, dueDateFromPaymentTerms, isBlankFieldValue, isValidPaymentTerms, receiptSettledInvoiceLabel, paymentSettledExpenseLabel, paymentVoucherTypeLabel, formatPdfINR, formatDocumentMoney, formatPdfDocument, invoiceLineAmounts, buildForexConversionQueue } from './utils/formatMoney';
+import { formatINR, sumField, toAmount, sameId, formatDateDDMMYYYY, nextDocumentNumber, sortRegistryNewestFirst, dateOnly, parseDateOnlyLocal, dueDateFromPaymentTerms, isBlankFieldValue, formatPartyAddressForDisplay, buildPartyAddressLine, isValidPaymentTerms, receiptSettledInvoiceLabel, paymentSettledExpenseLabel, paymentVoucherTypeLabel, formatPdfINR, formatDocumentMoney, formatPdfDocument, invoiceLineAmounts, buildForexConversionQueue } from './utils/formatMoney';
 import { formatCurrencyLabel, getCurrencySymbol } from './utils/currencyData';
 import { computeBankCashBalances } from './utils/ledgerBalances';
 import { showApiError } from './utils/apiErrors';
@@ -261,7 +261,7 @@ function App() {
   const isPortalAdmin = isCompanyStaffAdmin(currentUser);
   const isSuperAdmin = currentUser?.role === 'super_admin';
   const isGroupAdmin = userIsGroupAdmin(currentUser);
-  const canSwitchCo = canSwitchCompanies(currentUser);
+  const canSwitchCo = canSwitchCompanies(currentUser, companies);
   const [guestScreen, setGuestScreen] = useState('marketing');
   const [authMode, setAuthMode] = useState('login');
   const [showUpgrade, setShowUpgrade] = useState(false);
@@ -1122,12 +1122,22 @@ function SalesInvoicesSubTab() {
 
   const applyCustomerAutofill = (client, issueDateStr) => {
     if (!client) return;
-    setBillingAddress(`${client.billing_address}, ${client.billing_city}, ${client.billing_state} - ${client.billing_pincode}`);
-    setShippingAddress(
-      client.shipping_same
-        ? `${client.billing_address}, ${client.billing_city}, ${client.billing_state} - ${client.billing_pincode}`
-        : `${client.shipping_address}, ${client.shipping_city}, ${client.shipping_state} - ${client.shipping_pincode}`
-    );
+    const billLine = buildPartyAddressLine({
+      address: client.billing_address,
+      city: client.billing_city,
+      state: client.billing_state,
+      pincode: client.billing_pincode,
+    });
+    const shipLine = client.shipping_same
+      ? billLine
+      : buildPartyAddressLine({
+          address: client.shipping_address,
+          city: client.shipping_city,
+          state: client.shipping_state,
+          pincode: client.shipping_pincode,
+        });
+    setBillingAddress(billLine);
+    setShippingAddress(shipLine);
     setClientTaxId(client.gstin);
     setPlaceOfSupply(client.billing_state);
     setCurrency(client.currency || 'INR');
@@ -2213,11 +2223,13 @@ function SalesInvoicesSubTab() {
           (sum, item) => sum + invoiceLineAmounts(item).subtotal,
           0
         );
+        const pdfBillingAddress = formatPartyAddressForDisplay(inv.billing_address);
 
         return (
         <PdfPrintModal
           onClose={() => setSelectedInvoiceForPDF(null)}
           screenTitle="Sales Invoice Document"
+          maxWidth={960}
           toolbarExtra={
             <DocumentShareToolbar
               share={buildInvoiceSharePayload(inv, {
@@ -2229,68 +2241,72 @@ function SalesInvoicesSubTab() {
             />
           }
         >
-          <div className="pdf-print-page">
-            <h1 className="pdf-document-title">Tax Invoice</h1>
+          <div className="pdf-print-page pdf-invoice-page">
+            <div className="pdf-invoice-title-bar">
+              <h1 className="pdf-document-title">Tax Invoice</h1>
+            </div>
 
             <PdfDocumentHeader
               company={companyDetails}
               rightContent={
-                <>
-                  <p style={{ fontSize: '12px', fontWeight: 'bold', margin: '0 0 4px 0' }}>Invoice No: {inv.invoice_number}</p>
-                  <p style={{ fontSize: '12px', margin: '0 0 2px 0' }}><strong>Issue Date:</strong> {formatDateDDMMYYYY(inv.issue_date)}</p>
+                <div className="pdf-invoice-meta-block">
+                  <p className="pdf-invoice-meta-number">Invoice No: {inv.invoice_number}</p>
+                  <p className="pdf-invoice-meta-line"><strong>Issue Date:</strong> {formatDateDDMMYYYY(inv.issue_date)}</p>
                   <PdfOptionalLine
                     label="Due Date:"
                     value={formatDateDDMMYYYY(inv.due_date)}
                     style={{ fontSize: '12px', margin: '0 0 2px 0' }}
                   />
                   {inv.einvoice_status === 'generated' && inv.irn && (
-                    <p style={{ fontSize: '10px', margin: '4px 0 0', wordBreak: 'break-all' }}>
+                    <p className="pdf-invoice-meta-irn">
                       <strong>IRN:</strong> {inv.irn}
                     </p>
                   )}
-                </>
+                </div>
               }
             />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '20px' }}>
-              <div>
-                <h4 style={{ color: '#555', fontSize: '11px', textTransform: 'uppercase', margin: '0 0 6px 0' }}>Billed To:</h4>
-                <strong style={{ color: '#111' }}>{inv.customer_name}</strong>
-                <p style={{ fontSize: '12px', whiteSpace: 'pre-wrap', margin: '4px 0 0 0' }}>{inv.billing_address}</p>
+            <div className="pdf-invoice-parties">
+              <div className="pdf-invoice-party">
+                <h4 className="pdf-invoice-party-label">Billed To</h4>
+                <strong className="pdf-invoice-party-name">{inv.customer_name}</strong>
+                {pdfBillingAddress ? (
+                  <p className="pdf-invoice-party-address">{pdfBillingAddress}</p>
+                ) : null}
                 {!isBlankFieldValue(inv.gstin) && (
-                  <p style={{ fontSize: '12px', fontWeight: 'bold', marginTop: '4px' }}>GSTIN: {inv.gstin}</p>
+                  <p className="pdf-invoice-party-gstin">GSTIN: {inv.gstin}</p>
                 )}
               </div>
-              <div style={{ textAlign: 'right' }}>
+              <div className="pdf-invoice-party pdf-invoice-party--meta">
                 <PdfOptionalLine
                   label="PO Reference:"
                   value={inv.po_number}
-                  style={{ fontSize: '12px', margin: '0 0 2px 0' }}
+                  style={{ fontSize: '12px', margin: '0 0 4px 0' }}
                 />
                 {showPosOnPdf && (
-                  <p style={{ fontSize: '12px', margin: 0 }}><strong>Place of Supply:</strong> {inv.place_of_supply}</p>
+                  <p className="pdf-invoice-meta-line"><strong>Place of Supply:</strong> {inv.place_of_supply}</p>
                 )}
                 {inv.export_country && (
-                  <p style={{ fontSize: '12px', margin: '2px 0 0' }}><strong>Destination:</strong> {inv.export_country}</p>
+                  <p className="pdf-invoice-meta-line"><strong>Destination:</strong> {inv.export_country}</p>
                 )}
-                <p style={{ fontSize: '12px', margin: '2px 0 0' }}><strong>Currency:</strong> {formatCurrencyLabel(inv.currency || 'INR')}</p>
+                <p className="pdf-invoice-meta-line"><strong>Currency:</strong> {formatCurrencyLabel(inv.currency || 'INR')}</p>
               </div>
             </div>
 
-            <table className="pdf-meta-table" style={{ marginTop: '24px' }}>
+            <table className="pdf-meta-table pdf-invoice-items-table">
               <thead>
                 <tr>
-                  <th>Item Description</th>
+                  <th className="pdf-col-desc">Item Description</th>
                   <th>HSN/SAC</th>
-                  {showQty && <th style={{ textAlign: 'right' }}>Qty</th>}
-                  <th style={{ textAlign: 'right' }}>Rate ({pdfSym})</th>
-                  <th style={{ textAlign: 'right' }}>Amount ({pdfSym})</th>
+                  {showQty && <th className="pdf-col-num">Qty</th>}
+                  <th className="pdf-col-num">Rate ({pdfSym})</th>
+                  <th className="pdf-col-num">Amount ({pdfSym})</th>
                 </tr>
               </thead>
               <tbody>
                 {pdfLineItems.length === 0 ? (
                   <tr>
-                    <td colSpan={showQty ? 5 : 4} style={{ textAlign: 'center', color: '#666', fontSize: '12px' }}>
+                    <td colSpan={showQty ? 5 : 4} className="pdf-invoice-empty-items">
                       No line items found for this invoice.
                     </td>
                   </tr>
@@ -2305,20 +2321,20 @@ function SalesInvoicesSubTab() {
                           <td>{formatItemDisplay(item.description, item.item_detail)}</td>
                           <td>{item.hsn_sac}</td>
                           {showQty && (
-                            <td style={{ textAlign: 'right' }}>
+                            <td className="pdf-col-num">
                               {showLineQty
                                 ? formatINR(item.quantity, Number(item.quantity) % 1 === 0 ? 0 : 2)
                                 : ''}
                             </td>
                           )}
-                          <td style={{ textAlign: 'right' }}>{pdfFmt(item.unit_price)}</td>
-                          <td style={{ textAlign: 'right' }}>{pdfFmt(subtotal)}</td>
+                          <td className="pdf-col-num">{pdfFmt(item.unit_price)}</td>
+                          <td className="pdf-col-num">{pdfFmt(subtotal)}</td>
                         </tr>
                       );
                     })}
                     <tr className="pdf-items-total-row">
-                      <td colSpan={showQty ? 4 : 3} style={{ borderTop: '2px solid #333', borderRight: 'none', background: '#fff' }} />
-                      <td style={{ textAlign: 'right', borderTop: '2px solid #333', fontWeight: 'bold' }}>
+                      <td colSpan={showQty ? 4 : 3} className="pdf-items-total-spacer" />
+                      <td className="pdf-col-num pdf-items-total-amount">
                         {pdfFmt(itemsAmountTotal)}
                       </td>
                     </tr>
@@ -2327,58 +2343,82 @@ function SalesInvoicesSubTab() {
               </tbody>
             </table>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px', marginTop: '30px' }}>
-              <div style={{ fontSize: '11px', color: '#666' }}>
-                <p style={{ margin: '0 0 4px 0' }}><strong>Bank Details for Transfer:</strong></p>
+            <div className="pdf-invoice-footer-grid">
+              <div className="pdf-payment-box">
+                <h4 className="pdf-payment-box-title">Payment Details</h4>
                 <PdfOptionalLine
-                  label="A/C Holder's Name:"
+                  label="A/C Holder:"
                   value={companyDetails.bank_account_holder}
-                  style={{ margin: '2px 0' }}
+                  style={{ margin: '3px 0' }}
                 />
-                <p style={{ margin: '2px 0' }}>Account No.: {companyDetails.bank_account}</p>
-                <p style={{ margin: '2px 0' }}>Bank Name: {companyDetails.bank_name}</p>
-                <p style={{ margin: '2px 0' }}>IFSC: {companyDetails.bank_ifsc}</p>
+                <PdfOptionalLine
+                  label="Account No.:"
+                  value={companyDetails.bank_account}
+                  style={{ margin: '3px 0' }}
+                />
+                <PdfOptionalLine
+                  label="Bank Name:"
+                  value={companyDetails.bank_name}
+                  style={{ margin: '3px 0' }}
+                />
+                <PdfOptionalLine
+                  label="IFSC:"
+                  value={companyDetails.bank_ifsc}
+                  style={{ margin: '3px 0' }}
+                />
+                <PdfOptionalLine
+                  label="Branch:"
+                  value={companyDetails.bank_branch}
+                  style={{ margin: '3px 0' }}
+                />
+                {!isBlankFieldValue(companyDetails.upi_id) && (
+                  <p className="pdf-upi-line">
+                    <strong>UPI ID:</strong> <span>{companyDetails.upi_id}</span>
+                  </p>
+                )}
               </div>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                  <span>Subtotal:</span>
+              <div className="pdf-totals-box">
+                <div className="pdf-totals-row">
+                  <span>Subtotal</span>
                   <span>{pdfFmt(inv.subtotal)}</span>
                 </div>
                 {inv.discount > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#b91c1c' }}>
-                    <span>Discounts:</span>
+                  <div className="pdf-totals-row pdf-totals-row--discount">
+                    <span>Discounts</span>
                     <span>-{pdfFmt(inv.discount)}</span>
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}><span>CGST:</span><span>{pdfFmt(pdfTax.cgst)}</span></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}><span>SGST:</span><span>{pdfFmt(pdfTax.sgst)}</span></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}><span>IGST:</span><span>{pdfFmt(pdfTax.igst)}</span></div>
-                <div className="pdf-grand-total">
-                  <span>Grand Total ({pdfCur}):</span>
-                  <span style={{ color: '#111' }}>{pdfFmt(inv.total_amount)}</span>
+                <div className="pdf-totals-row"><span>CGST</span><span>{pdfFmt(pdfTax.cgst)}</span></div>
+                <div className="pdf-totals-row"><span>SGST</span><span>{pdfFmt(pdfTax.sgst)}</span></div>
+                <div className="pdf-totals-row"><span>IGST</span><span>{pdfFmt(pdfTax.igst)}</span></div>
+                <div className="pdf-grand-total pdf-totals-grand">
+                  <span>Grand Total ({pdfCur})</span>
+                  <span>{pdfFmt(inv.total_amount)}</span>
                 </div>
                 {(pdfAdvanceAdj > 0.009 || pdfCashRec > 0.009) && (
                   <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginTop: '8px', color: '#0f766e' }}>
-                      <span>Advance Adjusted:</span>
+                    <div className="pdf-totals-row pdf-totals-row--credit">
+                      <span>Advance Adjusted</span>
                       <span>-{pdfFmt(pdfAdvanceAdj)}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 'bold' }}>
-                      <span>Net Receivable:</span>
+                    <div className="pdf-totals-row pdf-totals-row--strong">
+                      <span>Net Receivable</span>
                       <span>{pdfFmt(pdfNetRecv)}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                      <span>Receipt Received:</span>
+                    <div className="pdf-totals-row">
+                      <span>Receipt Received</span>
                       <span>{pdfFmt(pdfCashRec)}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 'bold', borderTop: '1px solid #ddd', paddingTop: '6px', marginTop: '4px' }}>
-                      <span>Outstanding Balance:</span>
+                    <div className="pdf-totals-row pdf-totals-row--outstanding">
+                      <span>Outstanding Balance</span>
                       <span>{pdfFmt(pdfOutstanding)}</span>
                     </div>
                   </>
                 )}
               </div>
             </div>
+
+            <p className="pdf-invoice-thanks">Thank you for your business.</p>
           </div>
         </PdfPrintModal>
         );
@@ -9678,15 +9718,14 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState('user');
   const [newPassword, setNewPassword] = useState('user123'); // created by admin
-  const [newUserCompanyId, setNewUserCompanyId] = useState('');
-  const [newGroupAdminCompanyIds, setNewGroupAdminCompanyIds] = useState([]);
+  const [newAssignedCompanyIds, setNewAssignedCompanyIds] = useState([]);
   const [userCompanyFilter, setUserCompanyFilter] = useState('');
   const [editingUser, setEditingUser] = useState(null);
   const [editUserName, setEditUserName] = useState('');
   const [editUserEmail, setEditUserEmail] = useState('');
   const [editUserRole, setEditUserRole] = useState('user');
   const [editUserPassword, setEditUserPassword] = useState('');
-  const [editGroupAdminCompanyIds, setEditGroupAdminCompanyIds] = useState([]);
+  const [editAssignedCompanyIds, setEditAssignedCompanyIds] = useState([]);
   const [registeredPasswords, setRegisteredPasswords] = useState({});
 
   // Profile Edit fields
@@ -9705,6 +9744,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
   const [cBankAccountHolder, setCBankAccountHolder] = useState(companyDetails.bank_account_holder || '');
   const [cBankIfsc, setCBankIfsc] = useState(companyDetails.bank_ifsc || '');
   const [cBankBranch, setCBankBranch] = useState(companyDetails.bank_branch || '');
+  const [cUpiId, setCUpiId] = useState(companyDetails.upi_id || '');
   const [cAccountingFramework, setCAccountingFramework] = useState(companyDetails.accounting_framework || 'AS');
   const [profileSaving, setProfileSaving] = useState(false);
 
@@ -9725,6 +9765,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
     setCBankAccountHolder(details.bank_account_holder || '');
     setCBankIfsc(details.bank_ifsc || '');
     setCBankBranch(details.bank_branch || '');
+    setCUpiId(details.upi_id || '');
     setCAccountingFramework(details.accounting_framework || 'AS');
   };
 
@@ -9880,6 +9921,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
         bank_account_holder: cBankAccountHolder.trim(),
         bank_ifsc: cBankIfsc.trim(),
         bank_branch: cBankBranch.trim(),
+        upi_id: cUpiId.trim(),
         accounting_framework: cAccountingFramework,
       });
       applyProfileFormFields(saved);
@@ -9898,16 +9940,13 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
       alert('Email and Name are mandatory.');
       return;
     }
-    const companyId = isSuperAdmin
-      ? (newUserCompanyId ? parseInt(newUserCompanyId, 10) : activeCompany?.id)
-      : activeCompany?.id;
-    if (newRole === 'group_admin') {
-      if (!newGroupAdminCompanyIds.length) {
-        alert('Select at least one company for the group admin.');
-        return;
-      }
-    } else if (!companyId) {
-      alert('Select a company for this user.');
+    const assignedIds = isSuperAdmin
+      ? newAssignedCompanyIds.map((id) => parseInt(id, 10)).filter(Boolean)
+      : (activeCompany?.id ? [parseInt(activeCompany.id, 10)] : []);
+    if (!assignedIds.length) {
+      alert(isSuperAdmin
+        ? 'Select at least one company for this user.'
+        : 'Select a company for this user.');
       return;
     }
     try {
@@ -9916,10 +9955,8 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
         name: newName,
         role: newRole,
         password: newPassword,
-        company_id: newRole === 'group_admin' ? undefined : companyId,
-        company_ids: newRole === 'group_admin'
-          ? newGroupAdminCompanyIds.map((id) => parseInt(id, 10))
-          : undefined,
+        company_id: newRole === 'group_admin' ? undefined : assignedIds[0],
+        company_ids: assignedIds,
       });
       setRegisteredPasswords((prev) => ({ ...prev, [created.id]: newPassword }));
     } catch (err) {
@@ -9929,14 +9966,17 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
     alert(`Success: User account created successfully. Password: ${newPassword}`);
     setNewEmail('');
     setNewName('');
-    setNewGroupAdminCompanyIds([]);
+    setNewAssignedCompanyIds([]);
   };
 
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     if (!editingUser) return;
-    if (isSuperAdmin && editUserRole === 'group_admin' && !editGroupAdminCompanyIds.length) {
-      alert('Select at least one company for the group admin.');
+    const assignedIds = isSuperAdmin
+      ? editAssignedCompanyIds.map((id) => parseInt(id, 10)).filter(Boolean)
+      : [];
+    if (isSuperAdmin && !assignedIds.length) {
+      alert('Select at least one company for this user.');
       return;
     }
     try {
@@ -9946,17 +9986,18 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
         role: editUserRole,
         password: editUserPassword || undefined,
       };
-      if (isSuperAdmin && editUserRole === 'group_admin') {
-        payload.company_ids = editGroupAdminCompanyIds.map((id) => parseInt(id, 10));
-      } else if (isSuperAdmin && editingUser.company_id) {
-        payload.company_id = editingUser.company_id;
+      if (isSuperAdmin) {
+        payload.company_ids = assignedIds;
+        if (editUserRole !== 'group_admin') {
+          payload.company_id = assignedIds[0];
+        }
       }
       await updateUser(editingUser.id, payload);
       if (editUserPassword) {
         setRegisteredPasswords((prev) => ({ ...prev, [editingUser.id]: editUserPassword }));
       }
       setEditingUser(null);
-      setEditGroupAdminCompanyIds([]);
+      setEditAssignedCompanyIds([]);
       alert('User updated successfully.');
     } catch (err) {
       showApiError('Updating user', err);
@@ -9965,32 +10006,32 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
 
   const filteredUsers = users.filter((u) => {
     if (u.role === 'super_admin' || u.role === 'trial_owner') return false;
-    if (u.role === 'group_admin') {
-      if (!isSuperAdmin) return false;
-      if (!userCompanyFilter) return true;
-      return (u.managed_company_ids || []).some((companyId) => sameId(companyId, userCompanyFilter));
-    }
+    if (u.role === 'group_admin' && !isSuperAdmin) return false;
+
+    const assignedIds = (u.managed_company_ids && u.managed_company_ids.length)
+      ? u.managed_company_ids
+      : (u.company_id ? [u.company_id] : []);
+
     if (isSuperAdmin) {
       if (!userCompanyFilter) return true;
-      return sameId(u.company_id, userCompanyFilter);
+      return assignedIds.some((companyId) => sameId(companyId, userCompanyFilter));
     }
     if (isGroupAdmin) {
       const companyId = activeCompany?.id;
-      return companyId ? sameId(u.company_id, companyId) : false;
+      return companyId ? assignedIds.some((id) => sameId(id, companyId)) : false;
     }
     const companyId = activeCompany?.id || currentUser?.company_id;
-    return companyId ? sameId(u.company_id, companyId) : false;
+    return companyId ? assignedIds.some((id) => sameId(id, companyId)) : false;
   });
 
   const companyNameFor = (companyId) => companies.find((c) => sameId(c.id, companyId))?.name || `Company #${companyId}`;
 
   const companyNamesForUser = (user) => {
-    if (user.role === 'group_admin') {
-      const ids = user.managed_company_ids || [];
-      if (!ids.length) return 'No companies assigned';
-      return ids.map((companyId) => companyNameFor(companyId)).join(', ');
-    }
-    return companyNameFor(user.company_id);
+    const ids = (user.managed_company_ids && user.managed_company_ids.length)
+      ? user.managed_company_ids
+      : (user.company_id ? [user.company_id] : []);
+    if (!ids.length) return 'No companies assigned';
+    return ids.map((companyId) => companyNameFor(companyId)).join(', ');
   };
 
   const renderCompanyMultiSelect = (selectedIds, onChange, inputId) => (
@@ -10012,7 +10053,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
       </select>
       {selectedIds.length > 0 && (
         <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>
-          Selected: {selectedIds.map((id) => companyNameFor(id)).join(', ')}
+          Selected ({selectedIds.length}): {selectedIds.map((id) => companyNameFor(id)).join(', ')}
         </p>
       )}
     </div>
@@ -10379,7 +10420,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                 </div>
               </div>
 
-              <h4 className="form-section-title" style={{ marginTop: 20 }}>Bank details (shown on invoices &amp; vouchers)</h4>
+              <h4 className="form-section-title" style={{ marginTop: 20 }}>Bank &amp; UPI details (shown on invoices &amp; vouchers)</h4>
               <div className="form-grid-2">
                 <div className="form-group">
                   <label>A/C Holder&apos;s Name</label>
@@ -10400,6 +10441,10 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                 <div className="form-group">
                   <label>Branch</label>
                   <input type="text" className="form-input" value={cBankBranch} onChange={(e) => setCBankBranch(e.target.value)} readOnly={!isStaffAdmin} />
+                </div>
+                <div className="form-group">
+                  <label>UPI ID</label>
+                  <input type="text" className="form-input" value={cUpiId} onChange={(e) => setCUpiId(e.target.value)} readOnly={!isStaffAdmin} placeholder="e.g. company@okaxis" />
                 </div>
               </div>
 
@@ -10532,12 +10577,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                   <select
                     className="form-input"
                     value={editUserRole}
-                    onChange={(e) => {
-                      setEditUserRole(e.target.value);
-                      if (e.target.value !== 'group_admin') {
-                        setEditGroupAdminCompanyIds([]);
-                      }
-                    }}
+                    onChange={(e) => setEditUserRole(e.target.value)}
                   >
                     <option value="user">Standard User</option>
                     <option value="admin">Administrator</option>
@@ -10551,10 +10591,10 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                   <input className="form-input" value={editUserPassword} onChange={(e) => setEditUserPassword(e.target.value)} />
                 </div>
               </div>
-              {isSuperAdmin && editUserRole === 'group_admin' && renderCompanyMultiSelect(
-                editGroupAdminCompanyIds,
-                setEditGroupAdminCompanyIds,
-                'edit-group-admin-companies'
+              {isSuperAdmin && renderCompanyMultiSelect(
+                editAssignedCompanyIds,
+                setEditAssignedCompanyIds,
+                'edit-user-companies'
               )}
               <div className="btn-row">
                 <button
@@ -10562,7 +10602,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                   className="btn-secondary"
                   onClick={() => {
                     setEditingUser(null);
-                    setEditGroupAdminCompanyIds([]);
+                    setEditAssignedCompanyIds([]);
                   }}
                 >
                   Cancel
@@ -10589,12 +10629,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                 <select
                   className="form-input"
                   value={newRole}
-                  onChange={(e) => {
-                    setNewRole(e.target.value);
-                    if (e.target.value !== 'group_admin') {
-                      setNewGroupAdminCompanyIds([]);
-                    }
-                  }}
+                  onChange={(e) => setNewRole(e.target.value)}
                 >
                   <option value="user">Standard User (Work allotted, add/edit records only)</option>
                   <option value="admin">System Administrator (Full access, Dashboard configs)</option>
@@ -10603,22 +10638,16 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                   )}
                 </select>
               </div>
-              {isSuperAdmin && newRole !== 'group_admin' && (
-                <div className="form-group">
-                  <label>Assign to Company*</label>
-                  <select className="form-input" value={newUserCompanyId || activeCompany?.id || ''} onChange={(e) => setNewUserCompanyId(e.target.value)}>
-                    <option value="">-- Select company --</option>
-                    {(companies || []).map((co) => (
-                      <option key={co.id} value={co.id}>{co.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
             </div>
-            {isSuperAdmin && newRole === 'group_admin' && renderCompanyMultiSelect(
-              newGroupAdminCompanyIds,
-              setNewGroupAdminCompanyIds,
-              'new-group-admin-companies'
+            {isSuperAdmin && renderCompanyMultiSelect(
+              newAssignedCompanyIds,
+              setNewAssignedCompanyIds,
+              'new-user-companies'
+            )}
+            {!isSuperAdmin && activeCompany?.name && (
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                New users will be registered under <strong>{activeCompany.name}</strong>.
+              </p>
             )}
             <div className="form-grid-2">
               <div className="form-group">
@@ -10692,11 +10721,10 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                               setEditUserEmail(u.email);
                               setEditUserRole(u.role);
                               setEditUserPassword('');
-                              setEditGroupAdminCompanyIds(
-                                u.role === 'group_admin'
-                                  ? (u.managed_company_ids || []).map(String)
-                                  : []
-                              );
+                              const ids = (u.managed_company_ids && u.managed_company_ids.length)
+                                ? u.managed_company_ids
+                                : (u.company_id ? [u.company_id] : []);
+                              setEditAssignedCompanyIds(ids.map(String));
                             }}
                           >
                             Edit

@@ -2,8 +2,12 @@ export function isGroupAdmin(user) {
   return user?.role === 'group_admin';
 }
 
-export function canSwitchCompanies(user) {
-  return user?.role === 'super_admin' || user?.role === 'group_admin';
+export function canSwitchCompanies(user, companies = null) {
+  if (!user) return false;
+  if (user.role === 'super_admin' || user.role === 'group_admin') return true;
+  if ((user.managed_company_ids || []).length > 1) return true;
+  if (Array.isArray(companies) && companies.length > 1) return true;
+  return false;
 }
 
 export function isCompanyStaffAdmin(user) {

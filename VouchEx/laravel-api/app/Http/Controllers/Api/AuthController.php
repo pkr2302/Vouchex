@@ -198,6 +198,10 @@ class AuthController extends Controller
 
     private function userPayload(User $user): array
     {
+        $managed = $user->isSuperAdmin()
+            ? []
+            : $user->accessibleCompanyIds();
+
         return [
             'id' => $user->id,
             'email' => $user->email,
@@ -206,6 +210,7 @@ class AuthController extends Controller
             'company_id' => $user->company_id,
             'onboarding_step' => $user->onboarding_step,
             'created_at' => $user->created_at?->toIso8601String(),
+            'managed_company_ids' => $managed,
         ];
     }
 

@@ -55,16 +55,12 @@ class Company extends Model
 
         if ($user->isSuperAdmin()) {
             $rows = $query->get();
-        } elseif ($user->isGroupAdmin()) {
+        } else {
             $ids = $user->accessibleCompanyIds();
             if ($ids === []) {
                 return [];
             }
             $rows = $query->whereIn('companies.id', $ids)->get();
-        } elseif ($user->company_id) {
-            $rows = $query->where('companies.id', $user->company_id)->get();
-        } else {
-            return [];
         }
 
         return $rows->map(static fn ($company) => [

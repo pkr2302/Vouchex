@@ -872,17 +872,27 @@ class PortalMutationController extends Controller
             }
             $companyId = null;
         } else {
-            $companyId = TenantContext::getCompanyId();
-            if (!$companyId) {
-                return response()->json(['message' => 'Company context required.'], 422);
-            }
+            $companyIds = array_values(array_unique(array_map('intval', $data['company_ids'] ?? [])));
 
-            if ($actor->isSuperAdmin() && !empty($data['company_id'])) {
+            if ($actor->isSuperAdmin() && $companyIds !== []) {
+                $companyId = $companyIds[0];
+            } elseif ($actor->isSuperAdmin() && ! empty($data['company_id'])) {
                 $companyId = (int) $data['company_id'];
+                $companyIds = [$companyId];
+            } else {
+                $companyId = TenantContext::getCompanyId();
+                if (! $companyId) {
+                    return response()->json(['message' => 'Company context required.'], 422);
+                }
+                $companyIds = [(int) $companyId];
             }
 
-            if ($actor->isGroupAdmin() && ! $this->groupAdminCanAccessCompany($actor, $companyId)) {
-                return response()->json(['message' => 'You cannot create users for this company.'], 403);
+            if ($actor->isGroupAdmin()) {
+                foreach ($companyIds as $cid) {
+                    if (! $this->groupAdminCanAccessCompany($actor, $cid)) {
+                        return response()->json(['message' => 'You cannot create users for this company.'], 403);
+                    }
+                }
             }
         }
 
@@ -894,7 +904,7 @@ class PortalMutationController extends Controller
             'password' => $data['password'],
         ]);
 
-        if ($user->isGroupAdmin()) {
+        if ($companyIds !== []) {
             $user->managedCompanies()->sync($companyIds);
         }
 
@@ -908,9 +918,7 @@ class PortalMutationController extends Controller
                 'name' => $user->name,
                 'role' => $user->role,
                 'company_id' => $user->company_id,
-                'managed_company_ids' => $user->isGroupAdmin()
-                    ? $user->managedCompanies()->pluck('companies.id')->map(fn ($id) => (int) $id)->all()
-                    : [],
+                'managed_company_ids' => $user->managedCompanies()->pluck('companies.id')->map(fn ($id) => (int) $id)->all(),
             ],
         ], 201);
     }
@@ -980,18 +988,18 @@ class PortalMutationController extends Controller
         $query = User::query()->where('id', $id)->where('role', '!=', 'super_admin')->where('role', '!=', 'group_admin');
         if ($request->user()->isGroupAdmin()) {
             $ownedIds = $request->user()->accessibleCompanyIds();
-            $query->whereIn('company_id', $ownedIds);
+            $query->where(function ($q) use ($ownedIds) {
+                $q->whereIn('company_id', $ownedIds)
+                    ->orWhereHas('managedCompanies', fn ($mq) => $mq->whereIn('companies.id', $ownedIds));
+            });
         } elseif (! $request->user()->isSuperAdmin()) {
             $query->where('company_id', TenantContext::getCompanyId());
         }
         $user = $query->first();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['message' => 'User not found.'], 404);
         }
 
-        if ($request->user()->isSuperAdmin() && isset($data['company_id'])) {
-            $user->company_id = (int) $data['company_id'];
-        }
         if (isset($data['email'])) {
             $user->email = strtolower($data['email']);
         }
@@ -1014,6 +1022,19 @@ class PortalMutationController extends Controller
                 $user->role = $data['role'];
             }
         }
+
+        if ($user->role !== 'group_admin' && $request->user()->isSuperAdmin() && array_key_exists('company_ids', $data)) {
+            $companyIds = array_values(array_unique(array_map('intval', $data['company_ids'] ?? [])));
+            if ($companyIds === []) {
+                return response()->json(['message' => 'Select at least one company for this user.'], 422);
+            }
+            $user->company_id = $companyIds[0];
+            $user->managedCompanies()->sync($companyIds);
+        } elseif ($user->role !== 'group_admin' && $request->user()->isSuperAdmin() && isset($data['company_id'])) {
+            $user->company_id = (int) $data['company_id'];
+            $user->managedCompanies()->sync([(int) $data['company_id']]);
+        }
+
         if (!empty($data['password'])) {
             $user->password = $data['password'];
         }
@@ -1029,6 +1050,7 @@ class PortalMutationController extends Controller
                 'name' => $user->name,
                 'role' => $user->role,
                 'company_id' => $user->company_id,
+                'managed_company_ids' => $user->managedCompanies()->pluck('companies.id')->map(fn ($cid) => (int) $cid)->all(),
             ],
         ]);
     }
@@ -1125,6 +1147,7 @@ class PortalMutationController extends Controller
             'bank_account_holder' => 'nullable|string|max:255',
             'bank_ifsc' => 'nullable|string|max:20',
             'bank_branch' => 'nullable|string|max:255',
+            'upi_id' => 'nullable|string|max:100',
             'logo' => 'nullable|string|max:500000',
             'is_financial_year_locked' => 'boolean',
             'locked_months' => 'nullable|array',

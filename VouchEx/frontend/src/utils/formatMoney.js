@@ -167,6 +167,55 @@ export function isBlankFieldValue(value) {
   return !s || s === '—' || s.toUpperCase() === 'NIL';
 }
 
+/** True for quick-add / placeholder address fragments that should not print on PDFs. */
+function isPlaceholderAddressPart(part) {
+  const s = String(part || '').trim();
+  if (!s) return true;
+  if (/^to\s+be\s+updated$/i.test(s)) return true;
+  if (/^city$/i.test(s)) return true;
+  if (/^(—|-|n\/?a|nil)$/i.test(s)) return true;
+  if (/^0{4,}$/.test(s)) return true;
+  return false;
+}
+
+/**
+ * Builds a printable party address from customer/vendor fields, skipping placeholders.
+ * Returns '' when nothing meaningful is available.
+ */
+export function buildPartyAddressLine({ address, city, state, pincode, country } = {}) {
+  const parts = [address, city, state, pincode, country]
+    .map((p) => String(p ?? '').trim())
+    .filter((p) => p && !isPlaceholderAddressPart(p));
+  if (!parts.length) return '';
+  // "State - Pincode" style when last two look like state + pin
+  if (parts.length >= 2 && /^\d{4,6}$/.test(parts[parts.length - 1])) {
+    const pin = parts.pop();
+    return `${parts.join(', ')} - ${pin}`;
+  }
+  return parts.join(', ');
+}
+
+/** Cleans a stored billing_address string for PDF/print (hides "To be updated", etc.). */
+export function formatPartyAddressForDisplay(address) {
+  if (isBlankFieldValue(address)) return '';
+  const raw = String(address).trim();
+  if (/^to\s+be\s+updated$/i.test(raw)) return '';
+
+  const tokens = raw
+    .split(/,\s*|\s+-\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t && !isPlaceholderAddressPart(t) && !/to\s+be\s+updated/i.test(t));
+
+  if (!tokens.length) return '';
+  if (/to\s+be\s+updated/i.test(raw) && tokens.length <= 1) return '';
+
+  if (tokens.length >= 2 && /^\d{4,6}$/.test(tokens[tokens.length - 1])) {
+    const pin = tokens.pop();
+    return `${tokens.join(', ')} - ${pin}`;
+  }
+  return tokens.join(', ');
+}
+
 export function isTruthyFlag(value) {
   return value === true || value === 1 || value === '1';
 }

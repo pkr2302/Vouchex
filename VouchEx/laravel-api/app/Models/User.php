@@ -47,7 +47,7 @@ class User extends Authenticatable
         return $this->belongsTo(Company::class);
     }
 
-    /** Companies explicitly assigned to a group admin by the portal super admin. */
+    /** Companies explicitly assigned (group admin or multi-company staff). */
     public function managedCompanies(): BelongsToMany
     {
         return $this->belongsToMany(Company::class, 'user_companies')->withTimestamps();
@@ -68,10 +68,14 @@ class User extends Authenticatable
         return $this->role === 'group_admin';
     }
 
-    /** Super admin or group admin — may switch between allowed companies. */
+    /** Super admin, group admin, or staff with more than one assigned company. */
     public function canSwitchCompanies(): bool
     {
-        return $this->isSuperAdmin() || $this->isGroupAdmin();
+        if ($this->isSuperAdmin() || $this->isGroupAdmin()) {
+            return true;
+        }
+
+        return count($this->accessibleCompanyIds()) > 1;
     }
 
     public function isAdmin(): bool
@@ -102,7 +106,7 @@ class User extends Authenticatable
     /** @return list<int> */
     public function assignedCompanyIds(): array
     {
-        if (! $this->isGroupAdmin() || ! Schema::hasTable('user_companies')) {
+        if (! Schema::hasTable('user_companies')) {
             return [];
         }
 
@@ -115,7 +119,7 @@ class User extends Authenticatable
             ->all();
     }
 
-    /** Companies a group admin may access (assigned + created). */
+    /** Companies this user may access (primary + assigned + owned for group admins). */
     public function accessibleCompanyIds(): array
     {
         if ($this->isSuperAdmin()) {
@@ -126,10 +130,15 @@ class User extends Authenticatable
                 ->all();
         }
 
-        if (! $this->isGroupAdmin()) {
-            return $this->company_id ? [(int) $this->company_id] : [];
+        if ($this->isGroupAdmin()) {
+            return array_values(array_unique(array_merge($this->assignedCompanyIds(), $this->ownedCompanyIds())));
         }
 
-        return array_values(array_unique(array_merge($this->assignedCompanyIds(), $this->ownedCompanyIds())));
+        $ids = $this->assignedCompanyIds();
+        if ($this->company_id) {
+            $ids[] = (int) $this->company_id;
+        }
+
+        return array_values(array_unique($ids));
     }
 }

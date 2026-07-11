@@ -368,10 +368,10 @@ export function InlineCustomerModal({ open, onClose, onCreated }) {
         name: name.trim(),
         gst_type: gstType,
         gstin: gstin || 'NIL',
-        billing_address: 'To be updated',
-        billing_city: 'City',
+        billing_address: '',
+        billing_city: '',
         billing_state: billingState,
-        billing_pincode: '000000',
+        billing_pincode: '',
         billing_country: 'India',
         shipping_same: true,
       });
@@ -415,7 +415,7 @@ export function InlineVendorModal({ open, onClose, onCreated }) {
     if (isFinancialYearLocked) return alert('Period locked.');
     if (!name.trim()) return alert('Name required.');
     try {
-      const v = await createVendor({ name: name.trim(), billing_address: 'To be updated' });
+      const v = await createVendor({ name: name.trim(), billing_address: '' });
       onCreated?.(v);
       onClose();
       setName('');

@@ -26,6 +26,7 @@ const EMPTY_COMPANY = {
   bank_account_holder: '',
   bank_ifsc: '',
   bank_branch: '',
+  upi_id: '',
   logo: '',
   logo_layout: 'auto',
   accounting_framework: 'AS',
@@ -497,6 +498,7 @@ export const SimulatorProvider = ({ children }) => {
     bank_account_holder: details.bank_account_holder ?? '',
     bank_ifsc: details.bank_ifsc ?? '',
     bank_branch: details.bank_branch ?? '',
+    upi_id: details.upi_id ?? '',
     logo: details.logo ?? '',
     accounting_framework: details.accounting_framework ?? 'AS',
   });

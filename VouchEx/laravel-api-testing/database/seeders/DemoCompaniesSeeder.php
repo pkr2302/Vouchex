@@ -124,6 +124,7 @@ class DemoCompaniesSeeder extends Seeder
             'bank_account' => '502000'.str_pad((string) $company->id, 8, '0', STR_PAD_LEFT),
             'bank_ifsc' => 'HDFC0001234',
             'bank_branch' => 'SG Highway Branch',
+            'upi_id' => 'vouchex@okhdfcbank',
             'inactivity_timeout' => 900,
             'rcm_ledger_balance' => 8500,
             'accounting_framework' => $cfg['framework'],

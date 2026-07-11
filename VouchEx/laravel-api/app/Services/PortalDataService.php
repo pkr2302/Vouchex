@@ -355,6 +355,7 @@ class PortalDataService
                 'bank_account_holder' => '',
                 'bank_ifsc' => '',
                 'bank_branch' => '',
+                'upi_id' => '',
                 'logo' => '',
                 'logo_layout' => 'auto',
                 'accounting_framework' => 'AS',
@@ -403,6 +404,7 @@ class PortalDataService
             'bank_account_holder' => $company->bank_account_holder ?? '',
             'bank_ifsc' => $company->bank_ifsc ?? '',
             'bank_branch' => $company->bank_branch ?? '',
+            'upi_id' => $company->upi_id ?? '',
             'logo' => self::resolveCompanyLogo($company->logo ?? ''),
             'logo_layout' => ($company->custom_options ?? [])['logo_layout'] ?? 'auto',
             'accounting_framework' => $company->accounting_framework ?? 'AS',
@@ -446,7 +448,7 @@ class PortalDataService
         if ($actor && $actor->isSuperAdmin()) {
             $users = $query->get();
             $managedMap = $this->managedCompanyIdsForUsers(
-                $users->where('role', 'group_admin')->pluck('id')->map(static fn ($id) => (int) $id)->all()
+                $users->pluck('id')->map(static fn ($id) => (int) $id)->all()
             );
 
             return $users->map(fn ($user) => $this->mapPortalUser($user, $managedMap));
@@ -460,7 +462,15 @@ class PortalDataService
                 return collect();
             }
 
-            return $query->whereIn('company_id', $accessibleIds)->get()->map(fn ($user) => $this->mapPortalUser($user));
+            $users = $query->where(function ($q) use ($accessibleIds) {
+                $q->whereIn('company_id', $accessibleIds)
+                    ->orWhereHas('managedCompanies', fn ($mq) => $mq->whereIn('companies.id', $accessibleIds));
+            })->get();
+            $managedMap = $this->managedCompanyIdsForUsers(
+                $users->pluck('id')->map(static fn ($id) => (int) $id)->all()
+            );
+
+            return $users->map(fn ($user) => $this->mapPortalUser($user, $managedMap));
         }
 
         $companyId = \App\Support\TenantContext::getCompanyId();
@@ -468,26 +478,34 @@ class PortalDataService
             return collect();
         }
 
-        return $query->where('company_id', $companyId)->get()->map(fn ($user) => $this->mapPortalUser($user));
+        $users = $query->where(function ($q) use ($companyId) {
+            $q->where('company_id', $companyId)
+                ->orWhereHas('managedCompanies', fn ($mq) => $mq->where('companies.id', $companyId));
+        })->get();
+        $managedMap = $this->managedCompanyIdsForUsers(
+            $users->pluck('id')->map(static fn ($id) => (int) $id)->all()
+        );
+
+        return $users->map(fn ($user) => $this->mapPortalUser($user, $managedMap));
     }
 
     /** @param array<int, list<int>> $managedMap */
     private function mapPortalUser(\App\Models\User $user, array $managedMap = []): array
     {
-        $row = [
+        $managed = $managedMap[$user->id] ?? [];
+        if ($managed === [] && $user->company_id) {
+            $managed = [(int) $user->company_id];
+        }
+
+        return [
             'id' => $user->id,
             'email' => $user->email,
             'name' => $user->name,
             'role' => $user->role,
             'company_id' => $user->company_id,
             'created_at' => $user->created_at?->toIso8601String(),
+            'managed_company_ids' => $managed,
         ];
-
-        if ($user->role === 'group_admin') {
-            $row['managed_company_ids'] = $managedMap[$user->id] ?? [];
-        }
-
-        return $row;
     }
 
     /** @param list<int> $userIds @return array<int, list<int>> */

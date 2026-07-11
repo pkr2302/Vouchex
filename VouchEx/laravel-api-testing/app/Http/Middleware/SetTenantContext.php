@@ -37,15 +37,15 @@ class SetTenantContext
 
         if ($user->canSwitchCompanies()) {
             if (! $requestedCompanyId) {
-                if ($user->isGroupAdmin() && $user->accessibleCompanyIds() === []) {
+                if (! $user->isSuperAdmin() && $user->accessibleCompanyIds() === []) {
                     if ($request->is('api/portal/bootstrap')) {
                         return $next($request);
                     }
                 }
 
-                $cause = $user->isGroupAdmin()
-                    ? 'Group admin must choose a company before loading or saving company data.'
-                    : 'Super admin must choose a company before saving invoices, receipts, or other company data.';
+                $cause = $user->isSuperAdmin()
+                    ? 'Super admin must choose a company before saving invoices, receipts, or other company data.'
+                    : 'Select a company before loading or saving company data.';
 
                 return response()->json([
                     'message' => 'No company selected.',
@@ -59,13 +59,13 @@ class SetTenantContext
                 ->where('id', $requestedCompanyId)
                 ->where('is_active', true);
 
-            if ($user->isGroupAdmin()) {
+            if (! $user->isSuperAdmin()) {
                 if (! in_array($requestedCompanyId, $user->accessibleCompanyIds(), true)) {
                     return response()->json([
                         'message' => 'Company not found or inactive.',
                         'type' => 'company_context',
-                        'cause' => 'This company is not assigned to your group admin account.',
-                        'hint' => 'Select a company from your assigned list or ask the portal super admin to grant access.',
+                        'cause' => 'This company is not assigned to your account.',
+                        'hint' => 'Select a company from your assigned list or ask an administrator to grant access.',
                     ], 404);
                 }
             }

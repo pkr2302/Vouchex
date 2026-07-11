@@ -123,6 +123,7 @@ class OnboardingController extends Controller
             'bank_account_holder' => 'nullable|string|max:255',
             'bank_ifsc' => 'nullable|string|max:20',
             'bank_branch' => 'nullable|string|max:255',
+            'upi_id' => 'nullable|string|max:100',
         ]);
 
         $company = Company::findOrFail($user->company_id);
