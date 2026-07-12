@@ -116,6 +116,7 @@ import MarketingPage from './components/MarketingPage';
 import AuthPage from './components/AuthPage';
 import OnboardingPage from './components/OnboardingPage';
 import SubscriptionPage from './components/SubscriptionPage';
+import SubscriptionAdminPanel from './components/SubscriptionAdminPanel';
 import SetPasswordPage from './components/SetPasswordPage';
 import TrialBanner from './components/TrialBanner';
 import { isCompanyStaffAdmin, isGroupAdmin as userIsGroupAdmin, canSwitchCompanies, isPortalCompanyAdmin, roleDisplayLabel, resolveAuthPhase } from './utils/roleHelpers';
