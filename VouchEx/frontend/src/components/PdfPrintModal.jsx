@@ -1,8 +1,15 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Download } from 'lucide-react';
 
 /** Screen preview + print/download wrapper for A4 PDF documents. Toolbar hidden when printing. */
 export function PdfPrintModal({ onClose, screenTitle, children, maxWidth = 800, toolbarExtra = null, closeLabel = 'Close Viewer' }) {
+  const documentRef = useRef(null);
+
+  const enhancedToolbar =
+    toolbarExtra && React.isValidElement(toolbarExtra)
+      ? React.cloneElement(toolbarExtra, { documentRef })
+      : toolbarExtra;
+
   return (
     <div className="modal-overlay pdf-print-overlay" onClick={onClose}>
       <div
@@ -13,7 +20,7 @@ export function PdfPrintModal({ onClose, screenTitle, children, maxWidth = 800, 
         <div className="pdf-print-toolbar">
           <h2 className="pdf-print-screen-title">{screenTitle}</h2>
           <div className="pdf-print-toolbar-actions">
-            {toolbarExtra}
+            {enhancedToolbar}
             <button
               type="button"
               className="btn-primary"
@@ -27,7 +34,9 @@ export function PdfPrintModal({ onClose, screenTitle, children, maxWidth = 800, 
             </button>
           </div>
         </div>
-        <div className="pdf-print-document">{children}</div>
+        <div className="pdf-print-document" ref={documentRef}>
+          {children}
+        </div>
       </div>
     </div>
   );
