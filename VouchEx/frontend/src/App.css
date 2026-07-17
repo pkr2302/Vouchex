@@ -2999,8 +2999,9 @@ html.nav-scroll-lock .main-content {
   font-weight: 500;
 }
 
-/* Sales ledger — professional grouped layout, nothing clipped */
-.sales-ledger-wrap {
+/* Shared registry ledger (Sales + Purchase + Receipts + Payments + Returns) */
+.sales-ledger-wrap,
+.registry-ledger-wrap {
   overflow-x: auto;
   overflow-y: auto;
   max-height: calc(100vh - 200px);
@@ -3010,7 +3011,8 @@ html.nav-scroll-lock .main-content {
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
 }
 
-.sales-ledger {
+.sales-ledger,
+.registry-ledger {
   table-layout: fixed;
   width: 100%;
   min-width: 1040px;
@@ -3019,7 +3021,8 @@ html.nav-scroll-lock .main-content {
   font-size: 12.5px;
 }
 
-.sales-ledger thead th {
+.sales-ledger thead th,
+.registry-ledger thead th {
   position: sticky;
   top: 0;
   z-index: 5;
@@ -3034,7 +3037,8 @@ html.nav-scroll-lock .main-content {
   white-space: nowrap;
 }
 
-.sales-ledger thead th.sales-ledger__col-actions {
+.sales-ledger thead th.sales-ledger__col-actions,
+.registry-ledger thead th.registry-ledger__actions {
   position: sticky;
   right: 0;
   z-index: 6;
@@ -3042,19 +3046,104 @@ html.nav-scroll-lock .main-content {
   box-shadow: -6px 0 10px rgba(15, 23, 42, 0.15);
 }
 
-.sales-ledger tbody td {
+.sales-ledger tbody td,
+.registry-ledger tbody td {
   padding: 14px;
   vertical-align: middle;
   border-bottom: 1px solid #eef2f7;
   background: #fff;
 }
 
-.sales-ledger tbody tr:nth-child(even) td {
+.sales-ledger tbody tr:nth-child(even) td,
+.registry-ledger tbody tr:nth-child(even) td {
   background: #fafbfc;
 }
 
-.sales-ledger tbody tr:hover td {
+.sales-ledger tbody tr:hover td,
+.registry-ledger tbody tr:hover td {
   background: #f1f5f9;
+}
+
+.registry-ledger__doc { width: 16%; }
+.registry-ledger__party { width: 20%; }
+.registry-ledger__settle { width: 22%; }
+.registry-ledger__meta { width: 16%; }
+.registry-ledger__status { width: 10%; }
+.registry-ledger__actions {
+  width: 148px;
+  min-width: 148px;
+  max-width: 148px;
+  text-align: center;
+  padding-left: 8px !important;
+  padding-right: 10px !important;
+}
+
+.registry-ledger tbody td.registry-ledger__actions {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  background: #fff;
+  box-shadow: -6px 0 10px rgba(15, 23, 42, 0.05);
+  overflow: visible;
+}
+
+.registry-ledger tbody tr:nth-child(even) td.registry-ledger__actions {
+  background: #fafbfc;
+}
+
+.registry-ledger tbody tr:hover td.registry-ledger__actions {
+  background: #f1f5f9;
+}
+
+.registry-ledger__id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 700;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.registry-ledger__party-name {
+  font-weight: 650;
+  color: #0f172a;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.registry-ledger__sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.registry-ledger__amount {
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.registry-ledger__amount.is-in { color: #0f766e; }
+.registry-ledger__amount.is-out { color: #b91c1c; }
+
+.registry-ledger .registry-actions {
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.registry-ledger .btn-icon-sm {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
 }
 
 .sales-ledger__col-doc { width: 17%; }

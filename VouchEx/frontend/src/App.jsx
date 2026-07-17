@@ -157,6 +157,7 @@ import {
 import { buildCustomerLedger, buildVendorLedger } from './utils/partyLedgerUtils';
 import { DocumentShareButtons, DocumentShareToolbar } from './components/DocumentShareButtons';
 import { ExcelColumnFilter } from './components/ExcelColumnFilter';
+import { useExcelTableState } from './hooks/useExcelTableState';
 import { RegistryRowActions } from './components/RegistryRowActions';
 import MobilePortalShell from './components/mobile/MobilePortalShell';
 import { buildMobileNotifications, notificationCount } from './utils/mobileNotifications';
@@ -3268,10 +3269,37 @@ function CreditNotesSubTab() {
   const lastCnCustomerCurrencyRef = useRef('');
   const [creditNoteNumber, setCreditNoteNumber] = useState(`CN-2026-00${(creditNotes?.length || 0) + 1}`);
 
-  const sortedCreditNotes = useMemo(
+  const sortedCreditNotesBase = useMemo(
     () => sortRegistryNewestFirst(creditNotes, 'issue_date'),
     [creditNotes]
   );
+
+  const creditNoteExcelGetters = useMemo(
+    () => ({
+      document: (cn) => cn.credit_note_number || '',
+      party: (cn) => cn.customer_name || '',
+      amount: (cn) => toAmount(cn.total_amount),
+      reason: (cn) => cn.reason || '',
+      date: (cn) => cn.issue_date || '',
+    }),
+    []
+  );
+  const creditNoteExcelFilterGetters = useMemo(
+    () => ({
+      ...creditNoteExcelGetters,
+      amount: (cn) => `₹${toAmount(cn.total_amount).toLocaleString('en-IN')}`,
+      date: (cn) => formatDateDDMMYYYY(cn.issue_date),
+    }),
+    [creditNoteExcelGetters]
+  );
+  const {
+    excelSort: cnExcelSort,
+    setExcelSort: setCnExcelSort,
+    excelFilters: cnExcelFilters,
+    setExcelFilterFor: setCnExcelFilterFor,
+    columnValues: cnExcelValues,
+    displayedRows: sortedCreditNotes,
+  } = useExcelTableState(sortedCreditNotesBase, creditNoteExcelGetters, creditNoteExcelFilterGetters);
 
   // Form states
   const [customerId, setCustomerId] = useState('');
@@ -3721,21 +3749,62 @@ function CreditNotesSubTab() {
           </div>
         </form>
       ) : (
-        <div className="premium-table-wrapper" style={{ marginTop: '20px' }}>
-          <table className="premium-table">
+        <div className="premium-table-wrapper registry-ledger-wrap" style={{ marginTop: '20px' }}>
+          <table className="premium-table registry-ledger">
             <thead>
               <tr>
-                <th>Credit Note No</th>
-                <th>Original Invoice</th>
-                <th>Filing Date</th>
-                <th>Customer Legal Name</th>
-                <th>Filing Reason</th>
-                <th>Taxable Refund Value</th>
-                <th>CGST</th>
-                <th>SGST</th>
-                <th>IGST</th>
-                <th>Grand Credit Net</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <ExcelColumnFilter
+                  label="Document"
+                  columnKey="document"
+                  className="registry-ledger__doc"
+                  values={cnExcelValues.document}
+                  sort={cnExcelSort}
+                  onSort={setCnExcelSort}
+                  selected={cnExcelFilters.document || null}
+                  onFilter={(s) => setCnExcelFilterFor('document', s)}
+                />
+                <ExcelColumnFilter
+                  label="Client"
+                  columnKey="party"
+                  className="registry-ledger__party"
+                  values={cnExcelValues.party}
+                  sort={cnExcelSort}
+                  onSort={setCnExcelSort}
+                  selected={cnExcelFilters.party || null}
+                  onFilter={(s) => setCnExcelFilterFor('party', s)}
+                />
+                <ExcelColumnFilter
+                  label="Settlement"
+                  columnKey="amount"
+                  className="registry-ledger__settle"
+                  values={cnExcelValues.amount}
+                  sort={cnExcelSort}
+                  onSort={setCnExcelSort}
+                  selected={cnExcelFilters.amount || null}
+                  onFilter={(s) => setCnExcelFilterFor('amount', s)}
+                  valueType="number"
+                />
+                <ExcelColumnFilter
+                  label="Reason"
+                  columnKey="reason"
+                  className="registry-ledger__meta"
+                  values={cnExcelValues.reason}
+                  sort={cnExcelSort}
+                  onSort={setCnExcelSort}
+                  selected={cnExcelFilters.reason || null}
+                  onFilter={(s) => setCnExcelFilterFor('reason', s)}
+                />
+                <ExcelColumnFilter
+                  label="Date"
+                  columnKey="date"
+                  className="registry-ledger__status"
+                  values={cnExcelValues.date}
+                  sort={cnExcelSort}
+                  onSort={setCnExcelSort}
+                  selected={cnExcelFilters.date || null}
+                  onFilter={(s) => setCnExcelFilterFor('date', s)}
+                />
+                <th className="registry-ledger__actions">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -3745,17 +3814,34 @@ function CreditNotesSubTab() {
                 const cnTax = bifurcateStoredTax(cn, cnPos, registeredState);
                 return (
                 <tr key={cn.id}>
-                  <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{cn.credit_note_number}</td>
-                  <td style={{ fontFamily: 'monospace' }}>{cn.original_invoice_number ? `${cn.original_invoice_number} (${formatDateDDMMYYYY(cn.original_invoice_date)})` : '—'}</td>
-                  <td>{formatDateDDMMYYYY(cn.issue_date)}</td>
-                  <td><strong>{cn.customer_name}</strong></td>
-                  <td>{cn.reason}</td>
-                  <td style={{ fontWeight: 'bold' }}>₹{cn.subtotal.toLocaleString()}</td>
-                  <td style={{ fontSize: 11 }}>₹{cnTax.cgst.toLocaleString()}</td>
-                  <td style={{ fontSize: 11 }}>₹{cnTax.sgst.toLocaleString()}</td>
-                  <td style={{ fontSize: 11 }}>₹{cnTax.igst.toLocaleString()}</td>
-                  <td style={{ fontWeight: 'bold', color: 'var(--accent-teal)' }}>₹{cn.total_amount.toLocaleString()}</td>
-                  <td className="registry-actions-cell">
+                  <td className="registry-ledger__doc">
+                    <div className="registry-ledger__id">{cn.credit_note_number}</div>
+                    <div className="registry-ledger__sub">
+                      <span>{cn.original_invoice_number || '—'}</span>
+                    </div>
+                  </td>
+                  <td className="registry-ledger__party">
+                    <div className="registry-ledger__party-name">{cn.customer_name}</div>
+                  </td>
+                  <td className="registry-ledger__settle">
+                    <div className="registry-ledger__amount is-in">
+                      ₹{toAmount(cn.total_amount).toLocaleString('en-IN')}
+                    </div>
+                    <div className="registry-ledger__sub">
+                      <span>Taxable ₹{toAmount(cn.subtotal).toLocaleString('en-IN')}</span>
+                      {cnTax.igst > 0 ? (
+                        <span>IGST ₹{cnTax.igst.toLocaleString('en-IN')}</span>
+                      ) : (
+                        <>
+                          <span>CGST ₹{cnTax.cgst.toLocaleString('en-IN')}</span>
+                          <span>SGST ₹{cnTax.sgst.toLocaleString('en-IN')}</span>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                  <td className="registry-ledger__meta">{cn.reason}</td>
+                  <td className="registry-ledger__status">{formatDateDDMMYYYY(cn.issue_date)}</td>
+                  <td className="registry-ledger__actions registry-actions-cell">
                     <RegistryRowActions
                       onEdit={() => openEditCreditNote(cn)}
                       onView={() => setSelectedCNForPDF(cn)}
@@ -3770,7 +3856,7 @@ function CreditNotesSubTab() {
               );})}
               {sortedCreditNotes.length === 0 && (
                 <tr>
-                  <td colSpan="11" className="empty-state">No Credit Notes issued in outward sales accounts.</td>
+                  <td colSpan="6" className="empty-state">No Credit Notes issued in outward sales accounts.</td>
                 </tr>
               )}
             </tbody>
@@ -3906,10 +3992,37 @@ function DebitNotesSubTab() {
   const lastDnVendorCurrencyRef = useRef('');
   const [debitNoteNumber, setDebitNoteNumber] = useState(`DN-2026-00${(debitNotes?.length || 0) + 1}`);
 
-  const sortedDebitNotes = useMemo(
+  const sortedDebitNotesBase = useMemo(
     () => sortRegistryNewestFirst(debitNotes, 'issue_date'),
     [debitNotes]
   );
+
+  const debitNoteExcelGetters = useMemo(
+    () => ({
+      document: (dn) => dn.debit_note_number || '',
+      party: (dn) => dn.vendor_name || '',
+      amount: (dn) => toAmount(dn.total_amount),
+      reason: (dn) => dn.reason || '',
+      date: (dn) => dn.issue_date || '',
+    }),
+    []
+  );
+  const debitNoteExcelFilterGetters = useMemo(
+    () => ({
+      ...debitNoteExcelGetters,
+      amount: (dn) => `₹${toAmount(dn.total_amount).toLocaleString('en-IN')}`,
+      date: (dn) => formatDateDDMMYYYY(dn.issue_date),
+    }),
+    [debitNoteExcelGetters]
+  );
+  const {
+    excelSort: dnExcelSort,
+    setExcelSort: setDnExcelSort,
+    excelFilters: dnExcelFilters,
+    setExcelFilterFor: setDnExcelFilterFor,
+    columnValues: dnExcelValues,
+    displayedRows: sortedDebitNotes,
+  } = useExcelTableState(sortedDebitNotesBase, debitNoteExcelGetters, debitNoteExcelFilterGetters);
 
   // Form states
   const [vendorId, setVendorId] = useState('');
@@ -4371,21 +4484,62 @@ function DebitNotesSubTab() {
           </div>
         </form>
       ) : (
-        <div className="premium-table-wrapper" style={{ marginTop: '20px' }}>
-          <table className="premium-table">
+        <div className="premium-table-wrapper registry-ledger-wrap" style={{ marginTop: '20px' }}>
+          <table className="premium-table registry-ledger">
             <thead>
               <tr>
-                <th>Debit Note No</th>
-                <th>Original Bill</th>
-                <th>Filing Date</th>
-                <th>Vendor Legal Name</th>
-                <th>Filing Reason</th>
-                <th>Taxable Adjusted Value</th>
-                <th>CGST</th>
-                <th>SGST</th>
-                <th>IGST</th>
-                <th>Grand Debit Net</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <ExcelColumnFilter
+                  label="Document"
+                  columnKey="document"
+                  className="registry-ledger__doc"
+                  values={dnExcelValues.document}
+                  sort={dnExcelSort}
+                  onSort={setDnExcelSort}
+                  selected={dnExcelFilters.document || null}
+                  onFilter={(s) => setDnExcelFilterFor('document', s)}
+                />
+                <ExcelColumnFilter
+                  label="Supplier"
+                  columnKey="party"
+                  className="registry-ledger__party"
+                  values={dnExcelValues.party}
+                  sort={dnExcelSort}
+                  onSort={setDnExcelSort}
+                  selected={dnExcelFilters.party || null}
+                  onFilter={(s) => setDnExcelFilterFor('party', s)}
+                />
+                <ExcelColumnFilter
+                  label="Settlement"
+                  columnKey="amount"
+                  className="registry-ledger__settle"
+                  values={dnExcelValues.amount}
+                  sort={dnExcelSort}
+                  onSort={setDnExcelSort}
+                  selected={dnExcelFilters.amount || null}
+                  onFilter={(s) => setDnExcelFilterFor('amount', s)}
+                  valueType="number"
+                />
+                <ExcelColumnFilter
+                  label="Reason"
+                  columnKey="reason"
+                  className="registry-ledger__meta"
+                  values={dnExcelValues.reason}
+                  sort={dnExcelSort}
+                  onSort={setDnExcelSort}
+                  selected={dnExcelFilters.reason || null}
+                  onFilter={(s) => setDnExcelFilterFor('reason', s)}
+                />
+                <ExcelColumnFilter
+                  label="Date"
+                  columnKey="date"
+                  className="registry-ledger__status"
+                  values={dnExcelValues.date}
+                  sort={dnExcelSort}
+                  onSort={setDnExcelSort}
+                  selected={dnExcelFilters.date || null}
+                  onFilter={(s) => setDnExcelFilterFor('date', s)}
+                />
+                <th className="registry-ledger__actions">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -4395,17 +4549,34 @@ function DebitNotesSubTab() {
                 const dnTax = bifurcateStoredTax(dn, dnPos, registeredState);
                 return (
                 <tr key={dn.id}>
-                  <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{dn.debit_note_number}</td>
-                  <td style={{ fontFamily: 'monospace' }}>{dn.original_expense_number ? `${dn.original_expense_number} (${formatDateDDMMYYYY(dn.original_expense_date)})` : '—'}</td>
-                  <td>{formatDateDDMMYYYY(dn.issue_date)}</td>
-                  <td><strong>{dn.vendor_name}</strong></td>
-                  <td>{dn.reason}</td>
-                  <td style={{ fontWeight: 'bold' }}>₹{dn.subtotal.toLocaleString()}</td>
-                  <td style={{ fontSize: 11 }}>₹{dnTax.cgst.toLocaleString()}</td>
-                  <td style={{ fontSize: 11 }}>₹{dnTax.sgst.toLocaleString()}</td>
-                  <td style={{ fontSize: 11 }}>₹{dnTax.igst.toLocaleString()}</td>
-                  <td style={{ fontWeight: 'bold', color: 'var(--accent-red)' }}>₹{dn.total_amount.toLocaleString()}</td>
-                  <td className="registry-actions-cell">
+                  <td className="registry-ledger__doc">
+                    <div className="registry-ledger__id">{dn.debit_note_number}</div>
+                    <div className="registry-ledger__sub">
+                      <span>{dn.original_expense_number || '—'}</span>
+                    </div>
+                  </td>
+                  <td className="registry-ledger__party">
+                    <div className="registry-ledger__party-name">{dn.vendor_name}</div>
+                  </td>
+                  <td className="registry-ledger__settle">
+                    <div className="registry-ledger__amount is-out">
+                      ₹{toAmount(dn.total_amount).toLocaleString('en-IN')}
+                    </div>
+                    <div className="registry-ledger__sub">
+                      <span>Taxable ₹{toAmount(dn.subtotal).toLocaleString('en-IN')}</span>
+                      {dnTax.igst > 0 ? (
+                        <span>IGST ₹{dnTax.igst.toLocaleString('en-IN')}</span>
+                      ) : (
+                        <>
+                          <span>CGST ₹{dnTax.cgst.toLocaleString('en-IN')}</span>
+                          <span>SGST ₹{dnTax.sgst.toLocaleString('en-IN')}</span>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                  <td className="registry-ledger__meta">{dn.reason}</td>
+                  <td className="registry-ledger__status">{formatDateDDMMYYYY(dn.issue_date)}</td>
+                  <td className="registry-ledger__actions registry-actions-cell">
                     <RegistryRowActions
                       onEdit={() => openEditDebitNote(dn)}
                       onView={() => setSelectedDNForPDF(dn)}
@@ -4420,7 +4591,7 @@ function DebitNotesSubTab() {
               );})}
               {sortedDebitNotes.length === 0 && (
                 <tr>
-                  <td colSpan="11" className="empty-state">No Debit Notes raised in purchase/expense accounts.</td>
+                  <td colSpan="6" className="empty-state">No Debit Notes raised in purchase/expense accounts.</td>
                 </tr>
               )}
             </tbody>
@@ -4704,16 +4875,48 @@ function ReceiptTab() {
     }))
     .filter((inv) => inv.outstanding > 0.009);
 
-  const filteredRegistryReceipts = sortRegistryNewestFirst(
-    receipts.filter((rec) => {
-      if (filterCustomer && !sameId(rec.customer_id, filterCustomer)) return false;
-      const payDay = dateOnly(rec.payment_date);
-      if (filterStartDate && payDay < filterStartDate) return false;
-      if (filterEndDate && payDay > filterEndDate) return false;
-      return true;
-    }),
-    'payment_date'
+  const filteredRegistryReceiptsBase = useMemo(
+    () =>
+      sortRegistryNewestFirst(
+        receipts.filter((rec) => {
+          if (filterCustomer && !sameId(rec.customer_id, filterCustomer)) return false;
+          const payDay = dateOnly(rec.payment_date);
+          if (filterStartDate && payDay < filterStartDate) return false;
+          if (filterEndDate && payDay > filterEndDate) return false;
+          return true;
+        }),
+        'payment_date'
+      ),
+    [receipts, filterCustomer, filterStartDate, filterEndDate]
   );
+
+  const receiptExcelGetters = useMemo(
+    () => ({
+      document: (r) => r.receipt_number || '',
+      party: (r) => r.customer_name || '',
+      invoice: (r) => receiptSettledInvoiceLabel(r, invoices),
+      date: (r) => r.payment_date || '',
+      mode: (r) => r.payment_mode || '',
+      amount: (r) => toAmount(r.amount_received),
+    }),
+    [invoices]
+  );
+  const receiptExcelFilterGetters = useMemo(
+    () => ({
+      ...receiptExcelGetters,
+      date: (r) => formatDateDDMMYYYY(r.payment_date),
+      amount: (r) => `₹${toAmount(r.amount_received).toLocaleString('en-IN')}`,
+    }),
+    [receiptExcelGetters]
+  );
+  const {
+    excelSort: receiptExcelSort,
+    setExcelSort: setReceiptExcelSort,
+    excelFilters: receiptExcelFilters,
+    setExcelFilterFor: setReceiptExcelFilterFor,
+    columnValues: receiptExcelValues,
+    displayedRows: filteredRegistryReceipts,
+  } = useExcelTableState(filteredRegistryReceiptsBase, receiptExcelGetters, receiptExcelFilterGetters);
 
   // 4. Form options
   const filteredUnpaidInvoices = invoices.filter(
@@ -5641,39 +5844,94 @@ function ReceiptTab() {
               </div>
 
               {/* REGISTERED RECEIPTS TABLE */}
-              <div className="premium-table-wrapper desktop-only">
-                <table className="premium-table">
+              <div className="premium-table-wrapper desktop-only registry-ledger-wrap">
+                <table className="premium-table registry-ledger">
                   <thead>
                     <tr>
-                      <th>Receipt Voucher No.</th>
-                      <th>Client Name</th>
-                      <th>Settled Invoice</th>
-                      <th>Voucher Date</th>
-                      <th>Mode of Payment</th>
-                      <th>Deposited To Ledger</th>
-                      <th>Cheque / UTR</th>
-                      <th>TDS (₹)</th>
-                      <th>Discounts (₹)</th>
-                      <th>Amount Received</th>
-                      <th style={{ textAlign: 'right' }}>Voucher Actions</th>
+                      <ExcelColumnFilter
+                        label="Document"
+                        columnKey="document"
+                        className="registry-ledger__doc"
+                        values={receiptExcelValues.document}
+                        sort={receiptExcelSort}
+                        onSort={setReceiptExcelSort}
+                        selected={receiptExcelFilters.document || null}
+                        onFilter={(s) => setReceiptExcelFilterFor('document', s)}
+                      />
+                      <ExcelColumnFilter
+                        label="Client"
+                        columnKey="party"
+                        className="registry-ledger__party"
+                        values={receiptExcelValues.party}
+                        sort={receiptExcelSort}
+                        onSort={setReceiptExcelSort}
+                        selected={receiptExcelFilters.party || null}
+                        onFilter={(s) => setReceiptExcelFilterFor('party', s)}
+                      />
+                      <ExcelColumnFilter
+                        label="Settlement"
+                        columnKey="amount"
+                        className="registry-ledger__settle"
+                        values={receiptExcelValues.amount}
+                        sort={receiptExcelSort}
+                        onSort={setReceiptExcelSort}
+                        selected={receiptExcelFilters.amount || null}
+                        onFilter={(s) => setReceiptExcelFilterFor('amount', s)}
+                        valueType="number"
+                      />
+                      <ExcelColumnFilter
+                        label="Details"
+                        columnKey="mode"
+                        className="registry-ledger__meta"
+                        values={receiptExcelValues.mode}
+                        sort={receiptExcelSort}
+                        onSort={setReceiptExcelSort}
+                        selected={receiptExcelFilters.mode || null}
+                        onFilter={(s) => setReceiptExcelFilterFor('mode', s)}
+                      />
+                      <ExcelColumnFilter
+                        label="Date"
+                        columnKey="date"
+                        className="registry-ledger__status"
+                        values={receiptExcelValues.date}
+                        sort={receiptExcelSort}
+                        onSort={setReceiptExcelSort}
+                        selected={receiptExcelFilters.date || null}
+                        onFilter={(s) => setReceiptExcelFilterFor('date', s)}
+                      />
+                      <th className="registry-ledger__actions">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredRegistryReceipts.map((rec) => (
                       <tr key={rec.id}>
-                        <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{rec.receipt_number}</td>
-                        <td>{rec.customer_name}</td>
-                        <td style={{ fontFamily: 'monospace' }}>
-                          {receiptSettledInvoiceLabel(rec, invoices)}
+                        <td className="registry-ledger__doc">
+                          <div className="registry-ledger__id">{rec.receipt_number}</div>
+                          <div className="registry-ledger__sub">
+                            <span>{receiptSettledInvoiceLabel(rec, invoices)}</span>
+                          </div>
                         </td>
-                        <td>{formatDateDDMMYYYY(rec.payment_date)}</td>
-                        <td>{rec.payment_mode}</td>
-                        <td>{rec.deposit_to || 'HDFC Bank A/c'}</td>
-                        <td style={{ fontFamily: 'monospace' }}>{rec.reference_no}</td>
-                        <td style={{ color: 'var(--text-muted)' }}>₹{parseFloat(rec.tds_deducted || 0).toLocaleString()}</td>
-                        <td style={{ color: 'var(--text-muted)' }}>₹{parseFloat(rec.discount_allowed || 0).toLocaleString()}</td>
-                        <td style={{ fontWeight: 'bold', color: 'var(--accent-teal)' }}>₹{rec.amount_received.toLocaleString()}</td>
-                        <td className="registry-actions-cell">
+                        <td className="registry-ledger__party">
+                          <div className="registry-ledger__party-name">{rec.customer_name}</div>
+                        </td>
+                        <td className="registry-ledger__settle">
+                          <div className="registry-ledger__amount is-in">
+                            ₹{toAmount(rec.amount_received).toLocaleString('en-IN')}
+                          </div>
+                          <div className="registry-ledger__sub">
+                            <span>TDS ₹{toAmount(rec.tds_deducted).toLocaleString('en-IN')}</span>
+                            <span>Disc ₹{toAmount(rec.discount_allowed).toLocaleString('en-IN')}</span>
+                          </div>
+                        </td>
+                        <td className="registry-ledger__meta">
+                          <div>{rec.payment_mode}</div>
+                          <div className="registry-ledger__sub">
+                            <span>{rec.deposit_to || '—'}</span>
+                            {rec.reference_no ? <span>{rec.reference_no}</span> : null}
+                          </div>
+                        </td>
+                        <td className="registry-ledger__status">{formatDateDDMMYYYY(rec.payment_date)}</td>
+                        <td className="registry-ledger__actions registry-actions-cell">
                           <RegistryRowActions
                             onEdit={() => openEditReceipt(rec)}
                             onView={() => setSelectedReceiptForPDF(rec)}
@@ -5688,7 +5946,7 @@ function ReceiptTab() {
                     ))}
                     {filteredRegistryReceipts.length === 0 && (
                       <tr>
-                        <td colSpan="11" className="empty-state">No receipt vouchers match the current filter.</td>
+                        <td colSpan="6" className="empty-state">No receipt vouchers match the current filter.</td>
                       </tr>
                     )}
                   </tbody>
@@ -5941,19 +6199,51 @@ function ExpenseTab({ recordTypeFilter = 'expense', vendorMasterOnly = false, pu
     .filter((e) => e.outstanding > 0.009)
     .sort((a, b) => dateOnly(a.due_date).localeCompare(dateOnly(b.due_date)));
 
-  const filteredRegistryExpenses = sortRegistryNewestFirst(
-    scopedExpenses.filter((exp) => {
-      if (registrySearch.trim()) {
-        const q = registrySearch.trim().toLowerCase();
-        const hay = `${exp.expense_number} ${exp.invoice_number} ${exp.vendor_name} ${exp.expense_head}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      if (filterStartDate && dateOnly(exp.expense_date) < filterStartDate) return false;
-      if (filterEndDate && dateOnly(exp.expense_date) > filterEndDate) return false;
-      return true;
-    }),
-    'expense_date'
+  const filteredRegistryExpensesBase = useMemo(
+    () =>
+      sortRegistryNewestFirst(
+        scopedExpenses.filter((exp) => {
+          if (registrySearch.trim()) {
+            const q = registrySearch.trim().toLowerCase();
+            const hay = `${exp.expense_number} ${exp.invoice_number} ${exp.vendor_name} ${exp.expense_head}`.toLowerCase();
+            if (!hay.includes(q)) return false;
+          }
+          if (filterStartDate && dateOnly(exp.expense_date) < filterStartDate) return false;
+          if (filterEndDate && dateOnly(exp.expense_date) > filterEndDate) return false;
+          return true;
+        }),
+        'expense_date'
+      ),
+    [scopedExpenses, registrySearch, filterStartDate, filterEndDate]
   );
+
+  const expenseExcelGetters = useMemo(
+    () => ({
+      document: (e) => e.expense_number || '',
+      party: (e) => e.vendor_name || '',
+      amount: (e) => toAmount(e.total_amount),
+      status: (e) => e.payment_status || '',
+      date: (e) => e.expense_date || '',
+      head: (e) => e.expense_head || '',
+    }),
+    []
+  );
+  const expenseExcelFilterGetters = useMemo(
+    () => ({
+      ...expenseExcelGetters,
+      amount: (e) => `₹${toAmount(e.total_amount).toLocaleString('en-IN')}`,
+      date: (e) => formatDateDDMMYYYY(e.expense_date),
+    }),
+    [expenseExcelGetters]
+  );
+  const {
+    excelSort: expenseExcelSort,
+    setExcelSort: setExpenseExcelSort,
+    excelFilters: expenseExcelFilters,
+    setExcelFilterFor: setExpenseExcelFilterFor,
+    columnValues: expenseExcelValues,
+    displayedRows: filteredRegistryExpenses,
+  } = useExcelTableState(filteredRegistryExpensesBase, expenseExcelGetters, expenseExcelFilterGetters);
 
   const resetExpenseForm = () => {
     setEditingExpenseId(null);
@@ -6982,55 +7272,106 @@ function ExpenseTab({ recordTypeFilter = 'expense', vendorMasterOnly = false, pu
               </div>
               </MobileFilterShell>
 
-              <div className="premium-table-wrapper desktop-only">
-                <table className="premium-table">
+              <div className="premium-table-wrapper desktop-only registry-ledger-wrap">
+                <table className="premium-table registry-ledger">
                   <thead>
                     <tr>
-                      <th>Voucher ID</th>
-                      <th>Invoice No.</th>
-                      {!purchaseMode && <th>Expense Head</th>}
-                      <th>Supplier Name</th>
-                      <th>Bill Date</th>
-                      <th>ITC Claim</th>
-                      <th>TDS Deduct</th>
-                      <th>Total cost</th>
-                      <th>Settle Status</th>
-                      <th>Paid From / Ref</th>
-                      <th style={{ textAlign: 'right' }}>Actions</th>
+                      <ExcelColumnFilter
+                        label="Document"
+                        columnKey="document"
+                        className="registry-ledger__doc"
+                        values={expenseExcelValues.document}
+                        sort={expenseExcelSort}
+                        onSort={setExpenseExcelSort}
+                        selected={expenseExcelFilters.document || null}
+                        onFilter={(s) => setExpenseExcelFilterFor('document', s)}
+                      />
+                      <ExcelColumnFilter
+                        label="Supplier"
+                        columnKey="party"
+                        className="registry-ledger__party"
+                        values={expenseExcelValues.party}
+                        sort={expenseExcelSort}
+                        onSort={setExpenseExcelSort}
+                        selected={expenseExcelFilters.party || null}
+                        onFilter={(s) => setExpenseExcelFilterFor('party', s)}
+                      />
+                      <ExcelColumnFilter
+                        label="Settlement"
+                        columnKey="amount"
+                        className="registry-ledger__settle"
+                        values={expenseExcelValues.amount}
+                        sort={expenseExcelSort}
+                        onSort={setExpenseExcelSort}
+                        selected={expenseExcelFilters.amount || null}
+                        onFilter={(s) => setExpenseExcelFilterFor('amount', s)}
+                        valueType="number"
+                      />
+                      {!purchaseMode && (
+                        <ExcelColumnFilter
+                          label="Head"
+                          columnKey="head"
+                          className="registry-ledger__meta"
+                          values={expenseExcelValues.head}
+                          sort={expenseExcelSort}
+                          onSort={setExpenseExcelSort}
+                          selected={expenseExcelFilters.head || null}
+                          onFilter={(s) => setExpenseExcelFilterFor('head', s)}
+                        />
+                      )}
+                      <ExcelColumnFilter
+                        label="Status"
+                        columnKey="status"
+                        className="registry-ledger__status"
+                        values={expenseExcelValues.status}
+                        sort={expenseExcelSort}
+                        onSort={setExpenseExcelSort}
+                        selected={expenseExcelFilters.status || null}
+                        onFilter={(s) => setExpenseExcelFilterFor('status', s)}
+                      />
+                      <th className="registry-ledger__actions">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredRegistryExpenses.map((exp) => (
                       <tr key={exp.id}>
-                        <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{exp.expense_number}</td>
-                        <td style={{ fontFamily: 'monospace' }}>{exp.invoice_number}</td>
-                        {!purchaseMode && <td>{exp.expense_head}</td>}
-                        <td style={{ fontWeight: 'bold' }}>{exp.vendor_name}</td>
-                        <td>{formatDateDDMMYYYY(exp.expense_date)}</td>
-                        <td>
-                          <span className={`status-badge ${exp.itc_eligible ? 'paid' : 'draft'}`}>
-                            {exp.itc_eligible ? 'ELIGIBLE' : 'INELIGIBLE'}
-                          </span>
+                        <td className="registry-ledger__doc">
+                          <div className="registry-ledger__id">{exp.expense_number}</div>
+                          <div className="registry-ledger__sub">
+                            {exp.invoice_number ? <span>{exp.invoice_number}</span> : null}
+                            <span>{formatDateDDMMYYYY(exp.expense_date)}</span>
+                          </div>
                         </td>
-                        <td style={{ color: 'var(--text-muted)' }}>₹{toAmount(exp.tds_deducted).toLocaleString()}</td>
-                        <td style={{ fontWeight: 'bold', color: 'var(--accent-red)' }}>₹{exp.total_amount.toLocaleString()}</td>
-                        <td>
+                        <td className="registry-ledger__party">
+                          <div className="registry-ledger__party-name">{exp.vendor_name}</div>
+                          <div className="registry-ledger__sub">
+                            <span className={`status-badge ${exp.itc_eligible ? 'paid' : 'draft'}`}>
+                              {exp.itc_eligible ? 'ITC' : 'No ITC'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="registry-ledger__settle">
+                          <div className="registry-ledger__amount is-out">
+                            ₹{toAmount(exp.total_amount).toLocaleString('en-IN')}
+                          </div>
+                          <div className="registry-ledger__sub">
+                            <span>TDS ₹{toAmount(exp.tds_deducted).toLocaleString('en-IN')}</span>
+                            {exp.payment_status === 'Paid' ? (
+                              <span>{exp.paid_from_account || 'Paid'}</span>
+                            ) : (
+                              <span>Due {formatDateDDMMYYYY(exp.due_date)}</span>
+                            )}
+                          </div>
+                        </td>
+                        {!purchaseMode && (
+                          <td className="registry-ledger__meta">{exp.expense_head}</td>
+                        )}
+                        <td className="registry-ledger__status">
                           <span className={`status-badge ${exp.payment_status.toLowerCase() === 'paid' ? 'paid' : 'unpaid'}`}>
                             {exp.payment_status}
                           </span>
                         </td>
-                        <td>
-                          {exp.payment_status === 'Paid' ? (
-                            <span style={{ fontSize: '11px', color: 'var(--accent-teal)', fontFamily: 'monospace' }}>
-                              {exp.paid_from_account}<br/>Ref: {exp.payment_reference}
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: '11px', color: 'var(--accent-amber)', fontWeight: 'bold' }}>
-                              Due: {formatDateDDMMYYYY(exp.due_date)}
-                            </span>
-                          )}
-                        </td>
-                        <td className="registry-actions-cell">
+                        <td className="registry-ledger__actions registry-actions-cell">
                           <RegistryRowActions
                             onEdit={() => openEditExpense(exp)}
                             deleteLabel={`expense ${exp.expense_number}`}
@@ -7042,7 +7383,7 @@ function ExpenseTab({ recordTypeFilter = 'expense', vendorMasterOnly = false, pu
                     ))}
                     {filteredRegistryExpenses.length === 0 && (
                       <tr>
-                        <td colSpan={purchaseMode ? 10 : 11} className="empty-state">No bills found in registry.</td>
+                        <td colSpan={purchaseMode ? 5 : 6} className="empty-state">No bills found in registry.</td>
                       </tr>
                     )}
                   </tbody>
@@ -7324,10 +7665,38 @@ function PaymentTab() {
     }
   }, [bankAccounts, cashLedgers]);
 
-  const sortedPayments = useMemo(
+  const sortedPaymentsBase = useMemo(
     () => sortRegistryNewestFirst(payments, 'payment_date'),
     [payments]
   );
+
+  const paymentExcelGetters = useMemo(
+    () => ({
+      document: (p) => p.payment_number || '',
+      party: (p) => p.payee || '',
+      amount: (p) => toAmount(p.amount_paid),
+      type: (p) => paymentVoucherTypeLabel(p),
+      mode: (p) => p.payment_mode || '',
+      date: (p) => p.payment_date || '',
+    }),
+    []
+  );
+  const paymentExcelFilterGetters = useMemo(
+    () => ({
+      ...paymentExcelGetters,
+      amount: (p) => `₹${toAmount(p.amount_paid).toLocaleString('en-IN')}`,
+      date: (p) => formatDateDDMMYYYY(p.payment_date),
+    }),
+    [paymentExcelGetters]
+  );
+  const {
+    excelSort: paymentExcelSort,
+    setExcelSort: setPaymentExcelSort,
+    excelFilters: paymentExcelFilters,
+    setExcelFilterFor: setPaymentExcelFilterFor,
+    columnValues: paymentExcelValues,
+    displayedRows: sortedPayments,
+  } = useExcelTableState(sortedPaymentsBase, paymentExcelGetters, paymentExcelFilterGetters);
 
   const getPaymentShare = (voucher) => {
     const vendor = vendors.find(
@@ -7957,27 +8326,92 @@ function PaymentTab() {
           {!showRecordPayment && (
             <div className="table-card">
               <h3 className="chart-title" style={{ marginBottom: '16px' }}>Outflow Payments Voucher Registry</h3>
-              <div className="premium-table-wrapper desktop-only">
-                <table className="premium-table">
+              <div className="premium-table-wrapper desktop-only registry-ledger-wrap">
+                <table className="premium-table registry-ledger">
                   <thead>
                     <tr>
-                      <th>Voucher No.</th>
-                      <th>Supplier / Payee</th>
-                      <th>Type</th>
-                      <th>Settled Expense Bill</th>
-                      <th>Payment Date</th>
-                      <th>Paid From Ledger</th>
-                      <th>Mode / Ref No.</th>
-                      <th>Amount Paid (₹)</th>
-                      <th>Voucher Actions</th>
+                      <ExcelColumnFilter
+                        label="Document"
+                        columnKey="document"
+                        className="registry-ledger__doc"
+                        values={paymentExcelValues.document}
+                        sort={paymentExcelSort}
+                        onSort={setPaymentExcelSort}
+                        selected={paymentExcelFilters.document || null}
+                        onFilter={(s) => setPaymentExcelFilterFor('document', s)}
+                      />
+                      <ExcelColumnFilter
+                        label="Payee"
+                        columnKey="party"
+                        className="registry-ledger__party"
+                        values={paymentExcelValues.party}
+                        sort={paymentExcelSort}
+                        onSort={setPaymentExcelSort}
+                        selected={paymentExcelFilters.party || null}
+                        onFilter={(s) => setPaymentExcelFilterFor('party', s)}
+                      />
+                      <ExcelColumnFilter
+                        label="Settlement"
+                        columnKey="amount"
+                        className="registry-ledger__settle"
+                        values={paymentExcelValues.amount}
+                        sort={paymentExcelSort}
+                        onSort={setPaymentExcelSort}
+                        selected={paymentExcelFilters.amount || null}
+                        onFilter={(s) => setPaymentExcelFilterFor('amount', s)}
+                        valueType="number"
+                      />
+                      <ExcelColumnFilter
+                        label="Details"
+                        columnKey="mode"
+                        className="registry-ledger__meta"
+                        values={paymentExcelValues.mode}
+                        sort={paymentExcelSort}
+                        onSort={setPaymentExcelSort}
+                        selected={paymentExcelFilters.mode || null}
+                        onFilter={(s) => setPaymentExcelFilterFor('mode', s)}
+                      />
+                      <ExcelColumnFilter
+                        label="Type"
+                        columnKey="type"
+                        className="registry-ledger__status"
+                        values={paymentExcelValues.type}
+                        sort={paymentExcelSort}
+                        onSort={setPaymentExcelSort}
+                        selected={paymentExcelFilters.type || null}
+                        onFilter={(s) => setPaymentExcelFilterFor('type', s)}
+                      />
+                      <th className="registry-ledger__actions">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedPayments.map((pay) => (
                       <tr key={pay.id}>
-                        <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{pay.payment_number}</td>
-                        <td><strong>{pay.payee}</strong></td>
-                        <td>
+                        <td className="registry-ledger__doc">
+                          <div className="registry-ledger__id">{pay.payment_number}</div>
+                          <div className="registry-ledger__sub">
+                            <span>{formatDateDDMMYYYY(pay.payment_date)}</span>
+                            <span>{paymentSettledExpenseLabel(pay, expenses)}</span>
+                          </div>
+                        </td>
+                        <td className="registry-ledger__party">
+                          <div className="registry-ledger__party-name">{pay.payee}</div>
+                        </td>
+                        <td className="registry-ledger__settle">
+                          <div className="registry-ledger__amount is-out">
+                            ₹{toAmount(pay.amount_paid).toLocaleString('en-IN')}
+                          </div>
+                          <div className="registry-ledger__sub">
+                            <span>{pay.paid_from || 'Bank A/c'}</span>
+                          </div>
+                        </td>
+                        <td className="registry-ledger__meta">
+                          <div>{pay.payment_mode}</div>
+                          <div className="registry-ledger__sub">
+                            {pay.reference_no ? <span>{pay.reference_no}</span> : null}
+                          </div>
+                        </td>
+                        <td className="registry-ledger__status">
                           <span className="status-badge" style={{
                             backgroundColor: paymentVoucherTypeLabel(pay) === 'Advance' ? 'rgba(13, 148, 136, 0.1)' : 'rgba(59, 130, 246, 0.1)',
                             color: paymentVoucherTypeLabel(pay) === 'Advance' ? 'var(--accent-teal)' : 'var(--accent-blue)',
@@ -7985,12 +8419,7 @@ function PaymentTab() {
                             {paymentVoucherTypeLabel(pay)}
                           </span>
                         </td>
-                        <td style={{ fontFamily: 'monospace' }}>{paymentSettledExpenseLabel(pay, expenses)}</td>
-                        <td>{formatDateDDMMYYYY(pay.payment_date)}</td>
-                        <td>{pay.paid_from || 'Bank A/c'}</td>
-                        <td>{pay.payment_mode} <span style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--text-muted)' }}>({pay.reference_no})</span></td>
-                        <td style={{ fontWeight: 'bold', color: 'var(--accent-red)' }}>₹{pay.amount_paid.toLocaleString()}</td>
-                        <td className="registry-actions-cell">
+                        <td className="registry-ledger__actions registry-actions-cell">
                           <RegistryRowActions
                             onEdit={() => openEditPayment(pay)}
                             onView={() => setSelectedPaymentForPDF(pay)}
@@ -8005,7 +8434,7 @@ function PaymentTab() {
                     ))}
                     {sortedPayments.length === 0 && (
                       <tr>
-                        <td colSpan="9" className="empty-state">No payment disbursements recorded yet.</td>
+                        <td colSpan="6" className="empty-state">No payment disbursements recorded yet.</td>
                       </tr>
                     )}
                   </tbody>

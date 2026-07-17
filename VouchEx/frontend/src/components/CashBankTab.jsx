@@ -3,6 +3,8 @@ import { portalApi } from '../services/portalApi';
 import { formatDocumentMoney, formatINR } from '../utils/formatMoney';
 import { showApiError } from '../utils/apiErrors';
 import { Modal } from './portalShared';
+import { ExcelColumnFilter } from './ExcelColumnFilter';
+import { useExcelTableState } from '../hooks/useExcelTableState';
 
 function BalanceBar({ label, amount, max, color }) {
   const pct = max > 0 ? Math.max(4, (Math.abs(amount) / max) * 100) : 0;
@@ -70,37 +72,54 @@ function LedgerStatementModal({ open, onClose, account, fromDate, toDate }) {
               <div style={{ fontWeight: 700 }}>{statement.rows?.length || 0}</div>
             </div>
           </div>
-          <div className="premium-table-wrapper" style={{ maxHeight: 400, overflowY: 'auto' }}>
-            <table className="premium-table">
+          <div className="premium-table-wrapper registry-ledger-wrap" style={{ maxHeight: 400, overflowY: 'auto' }}>
+            <table className="premium-table registry-ledger">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Journal</th>
-                  <th>Source</th>
-                  <th>Particulars</th>
-                  <th style={{ textAlign: 'right' }}>Debit</th>
-                  <th style={{ textAlign: 'right' }}>Credit</th>
-                  <th style={{ textAlign: 'right' }}>Balance</th>
+                  <th className="registry-ledger__doc">Date</th>
+                  <th className="registry-ledger__party">Journal</th>
+                  <th className="registry-ledger__meta">Particulars</th>
+                  <th className="registry-ledger__settle">Movement</th>
+                  <th className="registry-ledger__status">Balance</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td colSpan={6}><em>Opening balance</em></td>
-                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatDocumentMoney(statement.opening_balance, 'INR')}</td>
+                  <td className="registry-ledger__doc" colSpan={3}><em>Opening balance</em></td>
+                  <td className="registry-ledger__settle">—</td>
+                  <td className="registry-ledger__status">
+                    <strong>{formatDocumentMoney(statement.opening_balance, 'INR')}</strong>
+                  </td>
                 </tr>
                 {(statement.rows || []).map((row, idx) => (
                   <tr key={`${row.journal_number}-${idx}`}>
-                    <td>{row.date}</td>
-                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{row.journal_number}</td>
-                    <td style={{ fontSize: 11 }}>{row.source_type || '—'}</td>
-                    <td style={{ fontSize: 12 }}>{row.description || '—'}</td>
-                    <td style={{ textAlign: 'right' }}>{row.debit > 0 ? formatDocumentMoney(row.debit, 'INR') : '—'}</td>
-                    <td style={{ textAlign: 'right' }}>{row.credit > 0 ? formatDocumentMoney(row.credit, 'INR') : '—'}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatDocumentMoney(row.balance, 'INR')}</td>
+                    <td className="registry-ledger__doc">
+                      <div className="registry-ledger__id">{row.date}</div>
+                      <div className="registry-ledger__sub"><span>{row.source_type || '—'}</span></div>
+                    </td>
+                    <td className="registry-ledger__party">
+                      <div className="registry-ledger__party-name" style={{ fontFamily: 'monospace' }}>{row.journal_number}</div>
+                    </td>
+                    <td className="registry-ledger__meta">{row.description || '—'}</td>
+                    <td className="registry-ledger__settle">
+                      {row.debit > 0 ? (
+                        <div className="registry-ledger__amount is-in">{formatDocumentMoney(row.debit, 'INR')}</div>
+                      ) : row.credit > 0 ? (
+                        <div className="registry-ledger__amount is-out">{formatDocumentMoney(row.credit, 'INR')}</div>
+                      ) : (
+                        '—'
+                      )}
+                      <div className="registry-ledger__sub">
+                        <span>{row.debit > 0 ? 'Debit' : row.credit > 0 ? 'Credit' : ''}</span>
+                      </div>
+                    </td>
+                    <td className="registry-ledger__status">
+                      <strong>{formatDocumentMoney(row.balance, 'INR')}</strong>
+                    </td>
                   </tr>
                 ))}
                 {statement.rows?.length === 0 && (
-                  <tr><td colSpan={7} className="empty-state">No GL postings in this period.</td></tr>
+                  <tr><td colSpan={5} className="empty-state">No GL postings in this period.</td></tr>
                 )}
               </tbody>
             </table>
@@ -146,10 +165,34 @@ export default function CashBankTab() {
     () => (summary?.rows || []).filter((r) => r.ledger_kind === 'bank'),
     [summary]
   );
-  const activeRows = subView === 'cash' ? cashRows : bankRows;
+  const activeRowsBase = subView === 'cash' ? cashRows : bankRows;
+  const cashBankExcelGetters = useMemo(
+    () => ({
+      code: (r) => r.account_code || '',
+      ledger: (r) => r.account_name || '',
+      balance: (r) => Number(r.balance) || 0,
+    }),
+    []
+  );
+  const cashBankExcelFilterGetters = useMemo(
+    () => ({
+      ...cashBankExcelGetters,
+      balance: (r) => formatDocumentMoney(r.balance, 'INR'),
+    }),
+    [cashBankExcelGetters]
+  );
+  const {
+    excelSort: cashBankExcelSort,
+    setExcelSort: setCashBankExcelSort,
+    excelFilters: cashBankExcelFilters,
+    setExcelFilterFor: setCashBankExcelFilterFor,
+    columnValues: cashBankExcelValues,
+    displayedRows: activeRows,
+  } = useExcelTableState(activeRowsBase, cashBankExcelGetters, cashBankExcelFilterGetters);
+
   const maxBal = useMemo(
-    () => Math.max(...activeRows.map((r) => Math.abs(r.balance)), 1),
-    [activeRows]
+    () => Math.max(...activeRowsBase.map((r) => Math.abs(r.balance)), 1),
+    [activeRowsBase]
   );
 
   const totalCash = summary?.totals?.cash ?? 0;
@@ -207,8 +250,8 @@ export default function CashBankTab() {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 0.9fr) minmax(320px, 1.4fr)', gap: 16 }}>
         <div className="table-card">
           <h3 className="chart-title">{subView === 'cash' ? 'Cash ledger balances' : 'Bank ledger balances'}</h3>
-          {activeRows.length > 0 ? (
-            activeRows.map((row) => (
+          {activeRowsBase.length > 0 ? (
+            activeRowsBase.map((row) => (
               <BalanceBar
                 key={row.gl_account_id}
                 label={`${row.account_code} — ${row.account_name}`}
@@ -223,23 +266,59 @@ export default function CashBankTab() {
         </div>
 
         <div className="table-card" style={{ padding: 0 }}>
-          <div className="premium-table-wrapper">
-            <table className="premium-table">
+          <div className="premium-table-wrapper registry-ledger-wrap">
+            <table className="premium-table registry-ledger">
               <thead>
                 <tr>
-                  <th>Code</th>
-                  <th>Ledger</th>
-                  <th style={{ textAlign: 'right' }}>Balance</th>
-                  <th style={{ textAlign: 'right' }}>Statement</th>
+                  <ExcelColumnFilter
+                    label="Code"
+                    columnKey="code"
+                    className="registry-ledger__doc"
+                    values={cashBankExcelValues.code}
+                    sort={cashBankExcelSort}
+                    onSort={setCashBankExcelSort}
+                    selected={cashBankExcelFilters.code || null}
+                    onFilter={(s) => setCashBankExcelFilterFor('code', s)}
+                  />
+                  <ExcelColumnFilter
+                    label="Ledger"
+                    columnKey="ledger"
+                    className="registry-ledger__party"
+                    values={cashBankExcelValues.ledger}
+                    sort={cashBankExcelSort}
+                    onSort={setCashBankExcelSort}
+                    selected={cashBankExcelFilters.ledger || null}
+                    onFilter={(s) => setCashBankExcelFilterFor('ledger', s)}
+                  />
+                  <ExcelColumnFilter
+                    label="Balance"
+                    columnKey="balance"
+                    className="registry-ledger__settle"
+                    values={cashBankExcelValues.balance}
+                    sort={cashBankExcelSort}
+                    onSort={setCashBankExcelSort}
+                    selected={cashBankExcelFilters.balance || null}
+                    onFilter={(s) => setCashBankExcelFilterFor('balance', s)}
+                    valueType="number"
+                  />
+                  <th className="registry-ledger__actions">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {activeRows.map((row) => (
                   <tr key={row.gl_account_id}>
-                    <td style={{ fontFamily: 'monospace' }}>{row.account_code}</td>
-                    <td>{row.account_name}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatDocumentMoney(row.balance, 'INR')}</td>
-                    <td style={{ textAlign: 'right' }}>
+                    <td className="registry-ledger__doc">
+                      <div className="registry-ledger__id">{row.account_code}</div>
+                    </td>
+                    <td className="registry-ledger__party">
+                      <div className="registry-ledger__party-name">{row.account_name}</div>
+                    </td>
+                    <td className="registry-ledger__settle">
+                      <div className={`registry-ledger__amount ${row.balance >= 0 ? 'is-in' : 'is-out'}`}>
+                        {formatDocumentMoney(row.balance, 'INR')}
+                      </div>
+                    </td>
+                    <td className="registry-ledger__actions">
                       <button
                         type="button"
                         className="btn-secondary"
