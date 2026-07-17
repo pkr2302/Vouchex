@@ -8,7 +8,9 @@ import {
   buildDebitNoteEmailBody,
 } from './emailCompose';
 import { openWhatsAppCompose } from './whatsappCompose';
-import { downloadBlobFile, generateDocumentPdfFile, sanitizePdfFileName } from './generateDocumentPdf';
+import { downloadBlobFile, generateDocumentPdfFile, sanitizePdfFileName, buildInvoicePdfFileName } from './generateDocumentPdf';
+
+export { buildInvoicePdfFileName } from './generateDocumentPdf';
 
 export function buildInvoiceSharePayload(invoice, { company, customer, lineItems, fromEmail }) {
   return {
@@ -17,7 +19,7 @@ export function buildInvoiceSharePayload(invoice, { company, customer, lineItems
     subject: `Tax Invoice ${invoice.invoice_number} — ${companyTradeName(company)}`,
     body: buildInvoiceEmailBody(invoice, company, customer, lineItems),
     fromEmail,
-    fileName: sanitizePdfFileName(`Invoice-${invoice.invoice_number}`),
+    fileName: buildInvoicePdfFileName(invoice),
   };
 }
 

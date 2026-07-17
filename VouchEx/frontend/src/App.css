@@ -2999,6 +2999,448 @@ html.nav-scroll-lock .main-content {
   font-weight: 500;
 }
 
+/* Sales ledger — professional grouped layout, nothing clipped */
+.sales-ledger-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e8edf3;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.sales-ledger {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 1040px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12.5px;
+}
+
+.sales-ledger thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 13px 14px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: none;
+  white-space: nowrap;
+}
+
+.sales-ledger thead th.sales-ledger__col-actions {
+  position: sticky;
+  right: 0;
+  z-index: 6;
+  background: #0f172a;
+  box-shadow: -6px 0 10px rgba(15, 23, 42, 0.15);
+}
+
+.sales-ledger tbody td {
+  padding: 14px;
+  vertical-align: middle;
+  border-bottom: 1px solid #eef2f7;
+  background: #fff;
+}
+
+.sales-ledger tbody tr:nth-child(even) td {
+  background: #fafbfc;
+}
+
+.sales-ledger tbody tr:hover td {
+  background: #f1f5f9;
+}
+
+.sales-ledger__col-doc { width: 17%; }
+.sales-ledger__col-client { width: 21%; }
+.sales-ledger__col-money { width: 25%; }
+.sales-ledger__col-tax { width: 13%; }
+.sales-ledger__col-status { width: 9%; }
+.sales-ledger__col-gst { width: 7%; }
+.sales-ledger__col-actions {
+  width: 148px;
+  min-width: 148px;
+  max-width: 148px;
+  text-align: center;
+  padding-left: 8px !important;
+  padding-right: 10px !important;
+}
+
+.sales-ledger tbody td.sales-ledger__col-actions {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  background: #fff;
+  box-shadow: -6px 0 10px rgba(15, 23, 42, 0.05);
+  overflow: visible;
+}
+
+.sales-ledger tbody tr:nth-child(even) td.sales-ledger__col-actions {
+  background: #fafbfc;
+}
+
+.sales-ledger tbody tr:hover td.sales-ledger__col-actions {
+  background: #f1f5f9;
+}
+
+.sales-ledger__inv {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 700;
+  font-size: 13px;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.sales-ledger__client {
+  font-weight: 650;
+  color: #0f172a;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sales-ledger__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.sales-ledger__type {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
+.sales-ledger__settle {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sales-ledger__settle-main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+}
+
+.sales-ledger__settle-item {
+  min-width: 0;
+}
+
+.sales-ledger__settle-item .sales-ledger__lbl {
+  margin-bottom: 3px;
+}
+
+.sales-ledger__settle-item strong {
+  display: block;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  font-weight: 750;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sales-ledger__settle-item .is-due {
+  color: #c2410c;
+}
+
+.sales-ledger__settle-item .is-clear {
+  color: #059669;
+}
+
+.sales-ledger__settle-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 2px;
+  padding-top: 7px;
+  border-top: 1px solid #eef2f7;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.sales-ledger__dot {
+  color: #cbd5e1;
+  margin: 0 4px;
+}
+
+.sales-ledger__lbl {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.sales-ledger__tax {
+  display: grid;
+  gap: 5px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #eef2f7;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: #334155;
+}
+
+.sales-ledger__tax > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.sales-ledger__tax > div > span:first-child {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.sales-ledger__tax > div > span:last-child {
+  text-align: right;
+  white-space: nowrap;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.sales-ledger__col-status {
+  text-align: center;
+}
+
+.sales-ledger__col-status .status-badge {
+  font-size: 10px;
+  padding: 4px 9px;
+}
+
+.sales-ledger__gst-line {
+  font-size: 10.5px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.sales-ledger .registry-actions-cell {
+  width: auto;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.sales-ledger .registry-actions {
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.sales-ledger .btn-icon-sm {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+
+/* Excel-style column filter (Sales Registry) */
+.excel-col-filter {
+  position: relative;
+  vertical-align: middle;
+}
+
+.excel-col-filter__head {
+  position: relative;
+  display: block;
+}
+
+.excel-col-filter__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.excel-col-filter__btn:hover,
+.excel-col-filter__btn.is-active {
+  color: #fff;
+}
+
+.excel-col-filter__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.excel-col-filter__sort-hint {
+  display: inline-flex;
+  opacity: 0.9;
+}
+
+.excel-col-filter__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: 240px;
+  max-width: min(240px, 70vw);
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+  padding: 8px;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+}
+
+.sales-ledger__col-actions .excel-col-filter__menu,
+.sales-ledger__col-status .excel-col-filter__menu,
+.sales-ledger__col-tax .excel-col-filter__menu {
+  left: auto;
+  right: 0;
+}
+
+.excel-col-filter__menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: #0f172a;
+  cursor: pointer;
+  text-align: left;
+}
+
+.excel-col-filter__menu-item:hover {
+  background: #f1f5f9;
+}
+
+.excel-col-filter__divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 6px 0;
+}
+
+.excel-col-filter__search {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  padding: 7px 9px;
+  font-size: 12.5px;
+  margin-bottom: 6px;
+}
+
+.excel-col-filter__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #334155;
+  cursor: pointer;
+}
+
+.excel-col-filter__check:hover {
+  background: #f8fafc;
+}
+
+.excel-col-filter__check span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.excel-col-filter__check--all {
+  font-weight: 650;
+  color: #0f172a;
+  border-bottom: 1px solid #eef2f7;
+  margin-bottom: 2px;
+  padding-bottom: 8px;
+}
+
+.excel-col-filter__list {
+  max-height: 180px;
+  overflow-y: auto;
+  margin: 2px 0 8px;
+}
+
+.excel-col-filter__empty {
+  padding: 10px 6px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.excel-col-filter__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid #eef2f7;
+}
+
+.excel-col-filter__link {
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 4px;
+}
+
+.excel-col-filter__ok {
+  padding: 6px 14px !important;
+  font-size: 12px !important;
+  border-radius: 8px !important;
+}
+
 .premium-table tr:last-child td {
   border-bottom: none;
 }

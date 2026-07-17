@@ -5,12 +5,14 @@ import { showApiError } from '../utils/apiErrors';
 
 /**
  * Compact horizontal action bar for registry table rows (icon-only, single line).
+ * @param {boolean} [shareInMenu] — put Email/WhatsApp inside the ⋯ menu so Delete never clips
  */
 export function RegistryRowActions({
   onEdit,
   onView,
   viewTitle = 'View PDF',
   share,
+  shareInMenu = false,
   deleteLabel,
   onDelete,
   deleteDisabled = false,
@@ -21,6 +23,22 @@ export function RegistryRowActions({
   const menuRef = useRef(null);
 
   const visibleMore = (moreItems || []).filter((item) => item && !item.hidden);
+
+  const shareMenuItems = shareInMenu && share
+    ? [
+        {
+          label: share.emailTo ? `Email ${share.emailTo}` : 'Email',
+          onClick: () => shareByEmail(share),
+        },
+        {
+          label: share.phone ? `WhatsApp ${share.phone}` : 'WhatsApp',
+          onClick: () => shareByWhatsApp(share),
+        },
+      ]
+    : [];
+
+  const menuItems = [...visibleMore, ...shareMenuItems];
+  const showInlineShare = !!share && !shareInMenu;
 
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -46,48 +64,17 @@ export function RegistryRowActions({
 
   return (
     <div className="registry-actions" ref={menuRef}>
-      {visibleMore.length > 0 && (
-        <div className="registry-actions-more">
-          <button
-            type="button"
-            className="btn-icon-sm"
-            title="More actions"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((o) => !o)}
-          >
-            <MoreHorizontal size={14} />
-          </button>
-          {menuOpen && (
-            <div className="registry-actions-menu" role="menu">
-              {visibleMore.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  className="registry-actions-menu-item"
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    item.onClick?.();
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+      {onView && (
+        <button type="button" className="btn-icon-sm" title={viewTitle} onClick={onView}>
+          <Eye size={14} />
+        </button>
       )}
       {onEdit && (
         <button type="button" className="btn-icon-sm" title="Edit" onClick={onEdit}>
           <Pencil size={13} />
         </button>
       )}
-      {onView && (
-        <button type="button" className="btn-icon-sm" title={viewTitle} onClick={onView}>
-          <Eye size={14} />
-        </button>
-      )}
-      {share && (
+      {showInlineShare && (
         <>
           <button
             type="button"
@@ -117,6 +104,37 @@ export function RegistryRowActions({
         >
           <Trash2 size={13} />
         </button>
+      )}
+      {menuItems.length > 0 && (
+        <div className="registry-actions-more">
+          <button
+            type="button"
+            className="btn-icon-sm"
+            title="More actions"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            <MoreHorizontal size={14} />
+          </button>
+          {menuOpen && (
+            <div className="registry-actions-menu" role="menu">
+              {menuItems.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  className="registry-actions-menu-item"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    item.onClick?.();
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

@@ -156,6 +156,7 @@ import {
 } from './utils/accountingHelpers';
 import { buildCustomerLedger, buildVendorLedger } from './utils/partyLedgerUtils';
 import { DocumentShareButtons, DocumentShareToolbar } from './components/DocumentShareButtons';
+import { ExcelColumnFilter } from './components/ExcelColumnFilter';
 import { RegistryRowActions } from './components/RegistryRowActions';
 import MobilePortalShell from './components/mobile/MobilePortalShell';
 import { buildMobileNotifications, notificationCount } from './utils/mobileNotifications';
@@ -187,6 +188,7 @@ import MobileFilterShell, { countActiveFilters } from './components/mobile/Mobil
 import { MobileSettingsNav, MobileTaxationNav, MobileReceiptNav, MobilePaymentNav } from './components/mobile/MobileModuleNav';
 import {
   buildInvoiceSharePayload,
+  buildInvoicePdfFileName,
   buildReceiptSharePayload,
   buildCreditNoteSharePayload,
   buildDebitNoteSharePayload,
@@ -1044,6 +1046,8 @@ function SalesInvoicesSubTab() {
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [registrySearch, setRegistrySearch] = useState('');
+  const [excelSort, setExcelSort] = useState(null);
+  const [excelFilters, setExcelFilters] = useState({});
   const invoiceFormRef = useRef(null);
   const skipCustomerAutofillRef = useRef(false);
   const lastAutofilledCustomerIdRef = useRef('');
@@ -1225,8 +1229,87 @@ function SalesInvoicesSubTab() {
     );
   }, [showAddForm, editingInvoiceId, issueDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filteredRegistryInvoices = sortRegistryNewestFirst(
-    invoices.filter((inv) => {
+  const filteredRegistryInvoices = useMemo(() => {
+    const base = sortRegistryNewestFirst(
+      invoices.filter((inv) => {
+        if (filterStartDate && inv.issue_date < filterStartDate) return false;
+        if (filterEndDate && inv.issue_date > filterEndDate) return false;
+        if (registrySearch.trim()) {
+          const q = registrySearch.trim().toLowerCase();
+          const hay = `${inv.invoice_number || ''} ${inv.customer_name || ''} ${inv.gstin || ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      }),
+      'issue_date'
+    );
+
+    const enriched = base.map((inv) => {
+      const taxB = invoiceStoredTax(inv, inv.place_of_supply, registeredState);
+      const invGross = invoiceEffectiveTotal(inv, creditNotes);
+      const taxTotal = toAmount(taxB.cgst) + toAmount(taxB.sgst) + toAmount(taxB.igst);
+      return {
+        inv,
+        document: inv.invoice_number || '',
+        client: inv.customer_name || '',
+        settlement: invGross,
+        settlementLabel: formatDocumentMoney(invGross, inv.currency || 'INR'),
+        tax: taxTotal,
+        taxLabel: formatDocumentMoney(taxTotal, inv.currency || 'INR'),
+        status: inv.status || '',
+      };
+    });
+
+    // Filter uses display labels for money; sort uses numeric fields
+    const getFilterValue = (row, key) => {
+      if (key === 'settlement') return row.settlementLabel;
+      if (key === 'tax') return row.taxLabel;
+      return row[key];
+    };
+    const getSortValue = (row, key) => {
+      if (key === 'settlement') return row.settlement;
+      if (key === 'tax') return row.tax;
+      return row[key];
+    };
+
+    let next = enriched;
+    Object.entries(excelFilters).forEach(([key, selected]) => {
+      if (!(selected instanceof Set)) return;
+      next = next.filter((row) => {
+        const raw = getFilterValue(row, key);
+        const token = raw == null || raw === '' ? '(Blank)' : String(raw);
+        return selected.has(token);
+      });
+    });
+
+    if (excelSort?.key) {
+      const dir = excelSort.dir === 'desc' ? -1 : 1;
+      const key = excelSort.key;
+      next = [...next].sort((a, b) => {
+        const va = getSortValue(a, key);
+        const vb = getSortValue(b, key);
+        if (va == null && vb == null) return 0;
+        if (va == null) return 1;
+        if (vb == null) return -1;
+        if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+        return String(va).localeCompare(String(vb), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+      });
+    }
+
+    return next.map((row) => row.inv);
+  }, [
+    invoices,
+    filterStartDate,
+    filterEndDate,
+    registrySearch,
+    excelSort,
+    excelFilters,
+    registeredState,
+    creditNotes,
+  ]);
+
+  const excelColumnValues = useMemo(() => {
+    const base = invoices.filter((inv) => {
       if (filterStartDate && inv.issue_date < filterStartDate) return false;
       if (filterEndDate && inv.issue_date > filterEndDate) return false;
       if (registrySearch.trim()) {
@@ -1235,9 +1318,38 @@ function SalesInvoicesSubTab() {
         if (!hay.includes(q)) return false;
       }
       return true;
-    }),
-    'issue_date'
-  );
+    });
+    return {
+      document: base.map((inv) => inv.invoice_number || ''),
+      client: base.map((inv) => inv.customer_name || ''),
+      settlement: base.map((inv) => {
+        const gross = invoiceEffectiveTotal(inv, creditNotes);
+        return formatDocumentMoney(gross, inv.currency || 'INR');
+      }),
+      tax: base.map((inv) => {
+        const taxB = invoiceStoredTax(inv, inv.place_of_supply, registeredState);
+        const taxTotal = toAmount(taxB.cgst) + toAmount(taxB.sgst) + toAmount(taxB.igst);
+        return formatDocumentMoney(taxTotal, inv.currency || 'INR');
+      }),
+      status: base.map((inv) => inv.status || ''),
+    };
+  }, [
+    invoices,
+    filterStartDate,
+    filterEndDate,
+    registrySearch,
+    creditNotes,
+    registeredState,
+  ]);
+
+  const setExcelFilterFor = (key, nextSet) => {
+    setExcelFilters((prev) => {
+      const copy = { ...prev };
+      if (nextSet == null) delete copy[key];
+      else copy[key] = nextSet;
+      return copy;
+    });
+  };
 
   const openEditInvoice = (inv) => {
     const pos = inv.place_of_supply || registeredState || 'Gujarat';
@@ -2024,28 +2136,65 @@ function SalesInvoicesSubTab() {
           </div>
         </div>
         </MobileFilterShell>
-        <div className="premium-table-wrapper desktop-only" style={{ marginTop: '20px' }}>
-          <table className="premium-table">
+        <div className="premium-table-wrapper desktop-only sales-ledger-wrap" style={{ marginTop: '20px' }}>
+          <table className="premium-table sales-ledger">
             <thead>
               <tr>
-                <th>Invoice Number</th>
-                <th>Type</th>
-                <th>Client Name</th>
-                <th>Issued</th>
-                <th>Due date</th>
-                <th>Tax State</th>
-                <th>Currency</th>
-                <th>Total Value</th>
-                <th>Advance Adj.</th>
-                <th>Net Receivable</th>
-                <th>Receipt Received</th>
-                <th>Outstanding</th>
-                <th>CGST</th>
-                <th>SGST</th>
-                <th>IGST</th>
-                <th>Status</th>
-                {(einvoiceEnabled || ewaybillEnabled) && <th>Compliance</th>}
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <ExcelColumnFilter
+                  label="Document"
+                  columnKey="document"
+                  className="sales-ledger__col-doc"
+                  values={excelColumnValues.document}
+                  sort={excelSort}
+                  onSort={setExcelSort}
+                  selected={excelFilters.document || null}
+                  onFilter={(s) => setExcelFilterFor('document', s)}
+                />
+                <ExcelColumnFilter
+                  label="Client"
+                  columnKey="client"
+                  className="sales-ledger__col-client"
+                  values={excelColumnValues.client}
+                  sort={excelSort}
+                  onSort={setExcelSort}
+                  selected={excelFilters.client || null}
+                  onFilter={(s) => setExcelFilterFor('client', s)}
+                />
+                <ExcelColumnFilter
+                  label="Settlement"
+                  columnKey="settlement"
+                  className="sales-ledger__col-money"
+                  values={excelColumnValues.settlement}
+                  sort={excelSort}
+                  onSort={setExcelSort}
+                  selected={excelFilters.settlement || null}
+                  onFilter={(s) => setExcelFilterFor('settlement', s)}
+                  valueType="number"
+                />
+                <ExcelColumnFilter
+                  label="Tax"
+                  columnKey="tax"
+                  className="sales-ledger__col-tax"
+                  title="CGST / SGST / IGST"
+                  values={excelColumnValues.tax}
+                  sort={excelSort}
+                  onSort={setExcelSort}
+                  selected={excelFilters.tax || null}
+                  onFilter={(s) => setExcelFilterFor('tax', s)}
+                  valueType="number"
+                />
+                <ExcelColumnFilter
+                  label="Status"
+                  columnKey="status"
+                  className="sales-ledger__col-status"
+                  values={excelColumnValues.status}
+                  sort={excelSort}
+                  onSort={setExcelSort}
+                  selected={excelFilters.status || null}
+                  onFilter={(s) => setExcelFilterFor('status', s)}
+                />
+                {(einvoiceEnabled || ewaybillEnabled) && <th className="sales-ledger__col-gst">GST</th>}
+                <th className="sales-ledger__col-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -2059,71 +2208,75 @@ function SalesInvoicesSubTab() {
                 const invOutstanding = invoiceOutstandingAmount(inv, receipts, creditNotes, advanceAdjustments);
                 return (
                 <tr key={inv.id}>
-                  <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{inv.invoice_number}</td>
-                  <td>{inv.invoice_type}</td>
-                  <td>{inv.customer_name}</td>
-                  <td>{formatDateDDMMYYYY(inv.issue_date)}</td>
-                  <td>{formatDateDDMMYYYY(inv.due_date)}</td>
-                  <td>{inv.place_of_supply}</td>
-                  <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{invCur}</td>
-                  <td style={{ fontWeight: 'bold' }}>{formatDocumentMoney(inv.total_amount, invCur)}</td>
-                  <td style={{ color: 'var(--accent-teal)', fontSize: 11 }}>{formatDocumentMoney(invAdvanceAdj, invCur)}</td>
-                  <td style={{ fontWeight: 'bold', fontSize: 11 }}>{formatDocumentMoney(invNetRecv, invCur)}</td>
-                  <td style={{ fontSize: 11 }}>{formatDocumentMoney(invCashRec, invCur)}</td>
-                  <td style={{ fontWeight: 'bold', color: invOutstanding > 0 ? 'var(--accent-amber)' : 'var(--accent-green)', fontSize: 11 }}>
-                    {formatDocumentMoney(invOutstanding, invCur)}
+                  <td className="sales-ledger__col-doc">
+                    <div className="sales-ledger__inv">{inv.invoice_number}</div>
+                    <div className="sales-ledger__meta">
+                      <span className="sales-ledger__type">{inv.invoice_type}</span>
+                      <span>{formatDateDDMMYYYY(inv.issue_date)}</span>
+                      {inv.due_date ? <span>Due {formatDateDDMMYYYY(inv.due_date)}</span> : null}
+                    </div>
                   </td>
-                  <td style={{ color: 'var(--text-muted)', fontSize: 11 }}>{formatDocumentMoney(taxB.cgst, invCur)}</td>
-                  <td style={{ color: 'var(--text-muted)', fontSize: 11 }}>{formatDocumentMoney(taxB.sgst, invCur)}</td>
-                  <td style={{ color: 'var(--text-muted)', fontSize: 11 }}>{formatDocumentMoney(taxB.igst, invCur)}</td>
-                  <td>
+                  <td className="sales-ledger__col-client">
+                    <div className="sales-ledger__client" title={inv.customer_name}>{inv.customer_name}</div>
+                    <div className="sales-ledger__meta">
+                      {inv.place_of_supply ? <span>{inv.place_of_supply}</span> : null}
+                      <span>{invCur}</span>
+                    </div>
+                  </td>
+                  <td className="sales-ledger__col-money">
+                    <div className="sales-ledger__settle">
+                      <div className="sales-ledger__settle-main">
+                        <div className="sales-ledger__settle-item">
+                          <span className="sales-ledger__lbl">Total</span>
+                          <strong>{formatDocumentMoney(invGross, invCur)}</strong>
+                        </div>
+                        <div className="sales-ledger__settle-item">
+                          <span className="sales-ledger__lbl">Outstanding</span>
+                          <strong className={invOutstanding > 0 ? 'is-due' : 'is-clear'}>
+                            {formatDocumentMoney(invOutstanding, invCur)}
+                          </strong>
+                        </div>
+                      </div>
+                      <div className="sales-ledger__settle-sub">
+                        <span>Adv {formatDocumentMoney(invAdvanceAdj, invCur)}</span>
+                        <span className="sales-ledger__dot">·</span>
+                        <span>Recd {formatDocumentMoney(invCashRec, invCur)}</span>
+                        <span className="sales-ledger__dot">·</span>
+                        <span>Net {formatDocumentMoney(invNetRecv, invCur)}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="sales-ledger__col-tax">
+                    <div className="sales-ledger__tax">
+                      <div><span>CGST</span><span>{formatDocumentMoney(taxB.cgst, invCur)}</span></div>
+                      <div><span>SGST</span><span>{formatDocumentMoney(taxB.sgst, invCur)}</span></div>
+                      <div><span>IGST</span><span>{formatDocumentMoney(taxB.igst, invCur)}</span></div>
+                    </div>
+                  </td>
+                  <td className="sales-ledger__col-status">
                     <span className={`status-badge ${inv.status.toLowerCase().replace(' ', '-')}`}>
                       {inv.status}
                     </span>
                   </td>
                   {(einvoiceEnabled || ewaybillEnabled) && (
-                    <td style={{ fontSize: 10 }}>
+                    <td className="sales-ledger__col-gst">
                       {einvoiceEnabled && (
-                        <div>
-                          IRN:{' '}
+                        <div className="sales-ledger__gst-line">
+                          IRN{' '}
                           {inv.einvoice_status === 'generated' && inv.irn
                             ? <span title={inv.irn}>{inv.irn.slice(0, 10)}…</span>
                             : <span className="gst-badge gst-badge--muted">{inv.einvoice_status || 'none'}</span>}
                         </div>
                       )}
                       {ewaybillEnabled && (
-                        <div>
-                          EWB:{' '}
-                          {ewayForInvoice(inv.id)?.ewb_no || '—'}
+                        <div className="sales-ledger__gst-line">
+                          EWB {ewayForInvoice(inv.id)?.ewb_no || '—'}
                         </div>
                       )}
                     </td>
                   )}
-                  <td className="registry-actions-cell">
+                  <td className="sales-ledger__col-actions registry-actions-cell">
                     <RegistryRowActions
-                      moreItems={[
-                        einvoiceEnabled && inv.einvoice_status !== 'generated' && inv.status !== 'Cancelled' && {
-                          label: 'Generate e-Invoice',
-                          onClick: () => setEinvoiceModalInvoice(inv),
-                        },
-                        einvoiceEnabled && inv.einvoice_status === 'generated' && {
-                          label: 'Cancel IRN',
-                          onClick: async () => {
-                            const reason = window.prompt('Reason for IRN cancellation?', 'Data entry mistake');
-                            if (reason == null) return;
-                            try {
-                              await cancelEinvoice(inv.id, reason);
-                              alert('IRN cancelled.');
-                            } catch (err) {
-                              showApiError('Cancelling e-Invoice', err);
-                            }
-                          },
-                        },
-                        ewaybillEnabled && !ewayForInvoice(inv.id) && inv.status !== 'Cancelled' && {
-                          label: 'Generate e-Way',
-                          onClick: () => setEwayModalInvoice(inv),
-                        },
-                      ].filter(Boolean)}
                       onEdit={() => openEditInvoice(inv)}
                       onView={() => setSelectedInvoiceForPDF(inv)}
                       share={getInvoiceShare(inv)}
@@ -2231,6 +2384,9 @@ function SalesInvoicesSubTab() {
           onClose={() => setSelectedInvoiceForPDF(null)}
           screenTitle="Sales Invoice Document"
           maxWidth={960}
+          downloadFileName={buildInvoicePdfFileName(inv, {
+            amount: invoiceEffectiveTotal(inv, creditNotes),
+          })}
           toolbarExtra={
             <DocumentShareToolbar
               share={buildInvoiceSharePayload(inv, {

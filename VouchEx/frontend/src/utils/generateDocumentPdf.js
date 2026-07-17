@@ -1,15 +1,45 @@
 import html2pdf from 'html2pdf.js';
 
-/** Safe filename fragment for downloads / share sheets. */
+/** Safe filename for downloads / share sheets. Keeps spaces for readability. */
 export function sanitizePdfFileName(name, fallback = 'document') {
   const base = String(name || fallback)
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 120);
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[.\s]+|[.\s]+$/g, '')
+    .slice(0, 150);
   const withExt = /\.pdf$/i.test(base) ? base : `${base || fallback}.pdf`;
   return withExt;
+}
+
+/** Short invoice no for filenames — INV-2026-002 → 2 */
+export function invoiceFileNumber(invoiceNumber) {
+  const s = String(invoiceNumber || '').trim();
+  if (!s) return '';
+  const m = s.match(/(\d+)(?!.*\d)/);
+  if (m) return String(Number(m[1]));
+  return s;
+}
+
+/**
+ * e.g. "Invoice 2 - Girnar Software Private Limited - Value Rs 9,13,382.54.pdf"
+ */
+export function buildInvoicePdfFileName(invoice, { amount } = {}) {
+  const no = invoiceFileNumber(invoice?.invoice_number) || invoice?.invoice_number || 'Invoice';
+  const party = String(invoice?.customer_name || 'Customer').replace(/\s+/g, ' ').trim() || 'Customer';
+  const total = amount != null ? amount : invoice?.total_amount;
+  const valuePart = formatInrValueForFileName(total, invoice?.currency || 'INR');
+  return sanitizePdfFileName(`Invoice ${no} - ${party} - Value ${valuePart}`);
+}
+
+function formatInrValueForFileName(value, currency = 'INR') {
+  const code = String(currency || 'INR').toUpperCase();
+  const n = Number(value);
+  const num = Number.isFinite(n)
+    ? n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : '0.00';
+  if (code === 'INR') return `Rs ${num}`;
+  return `${code} ${num}`;
 }
 
 /**
