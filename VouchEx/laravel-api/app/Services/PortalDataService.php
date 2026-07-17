@@ -505,6 +505,7 @@ class PortalDataService
             'company_id' => $user->company_id,
             'created_at' => $user->created_at?->toIso8601String(),
             'managed_company_ids' => $managed,
+            'company_roles' => $this->companyRolesForUser((int) $user->id, (string) $user->role),
         ];
     }
 
@@ -518,6 +519,25 @@ class PortalDataService
         $map = [];
         foreach (DB::table('user_companies')->whereIn('user_id', $userIds)->get(['user_id', 'company_id']) as $row) {
             $map[(int) $row->user_id][] = (int) $row->company_id;
+        }
+
+        return $map;
+    }
+
+    /** @return array<string, string> */
+    private function companyRolesForUser(int $userId, string $fallbackRole): array
+    {
+        if (! Schema::hasTable('user_companies')) {
+            return [];
+        }
+
+        $hasRole = Schema::hasColumn('user_companies', 'role');
+        $map = [];
+        foreach (DB::table('user_companies')->where('user_id', $userId)->get() as $row) {
+            $role = $hasRole ? ($row->role ?? null) : null;
+            $map[(string) (int) $row->company_id] = in_array($role, ['admin', 'user'], true)
+                ? $role
+                : ($fallbackRole === 'admin' ? 'admin' : 'user');
         }
 
         return $map;

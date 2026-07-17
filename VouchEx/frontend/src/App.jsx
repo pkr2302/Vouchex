@@ -94,6 +94,7 @@ import FinancialPeriodBar, { getDefaultAppliedPeriod } from './components/Financ
 import DebtorsTab from './components/DebtorsTab';
 import CreditorsTab from './components/CreditorsTab';
 import CashBankTab from './components/CashBankTab';
+import CompanyAccessPicker, { UserAccessPicker } from './components/CompanyAccessPicker';
 import RegistersTab from './components/RegistersTab';
 import GuidedActionsTab from './components/GuidedActionsTab';
 import ComplianceCalendarPanel from './components/ComplianceCalendarPanel';
@@ -10295,6 +10296,8 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
   const [newCompanyName, setNewCompanyName] = useState('');
   const [newCompanyGstin, setNewCompanyGstin] = useState('');
   const [newCompanyState, setNewCompanyState] = useState('Gujarat');
+  const [newCompanyUserIds, setNewCompanyUserIds] = useState([]);
+  const [newCompanyUserRoles, setNewCompanyUserRoles] = useState({});
   const [companyCreating, setCompanyCreating] = useState(false);
   const [companyDeletingId, setCompanyDeletingId] = useState(null);
   
@@ -10305,6 +10308,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
   const [newRole, setNewRole] = useState('user');
   const [newPassword, setNewPassword] = useState('user123'); // created by admin
   const [newAssignedCompanyIds, setNewAssignedCompanyIds] = useState([]);
+  const [newCompanyRoles, setNewCompanyRoles] = useState({});
   const [userCompanyFilter, setUserCompanyFilter] = useState('');
   const [editingUser, setEditingUser] = useState(null);
   const [editUserName, setEditUserName] = useState('');
@@ -10312,7 +10316,15 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
   const [editUserRole, setEditUserRole] = useState('user');
   const [editUserPassword, setEditUserPassword] = useState('');
   const [editAssignedCompanyIds, setEditAssignedCompanyIds] = useState([]);
+  const [editCompanyRoles, setEditCompanyRoles] = useState({});
   const [registeredPasswords, setRegisteredPasswords] = useState({});
+
+  const assignableCompanies = companies || [];
+  const canAssignCompanies = isSuperAdmin || isGroupAdmin || isCompanyAdmin;
+  const assignableUsersForNewCompany = useMemo(
+    () => (users || []).filter((u) => u.role !== 'super_admin' && u.role !== 'trial_owner' && u.id !== currentUser?.id),
+    [users, currentUser?.id]
+  );
 
   // Profile Edit fields
   const [cName, setCName] = useState(companyDetails.name);
@@ -10526,15 +10538,20 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
       alert('Email and Name are mandatory.');
       return;
     }
-    const assignedIds = isSuperAdmin
+    const assignedIds = canAssignCompanies
       ? newAssignedCompanyIds.map((id) => parseInt(id, 10)).filter(Boolean)
       : (activeCompany?.id ? [parseInt(activeCompany.id, 10)] : []);
     if (!assignedIds.length) {
-      alert(isSuperAdmin
+      alert(canAssignCompanies
         ? 'Select at least one company for this user.'
         : 'Select a company for this user.');
       return;
     }
+    const companyRoles = {};
+    assignedIds.forEach((id) => {
+      const key = String(id);
+      companyRoles[key] = newCompanyRoles[key] || (newRole === 'admin' ? 'admin' : 'user');
+    });
     try {
       const created = await createUser({
         email: newEmail,
@@ -10543,6 +10560,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
         password: newPassword,
         company_id: newRole === 'group_admin' ? undefined : assignedIds[0],
         company_ids: assignedIds,
+        company_roles: newRole === 'group_admin' ? undefined : companyRoles,
       });
       setRegisteredPasswords((prev) => ({ ...prev, [created.id]: newPassword }));
     } catch (err) {
@@ -10553,15 +10571,16 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
     setNewEmail('');
     setNewName('');
     setNewAssignedCompanyIds([]);
+    setNewCompanyRoles({});
   };
 
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     if (!editingUser) return;
-    const assignedIds = isSuperAdmin
+    const assignedIds = canAssignCompanies
       ? editAssignedCompanyIds.map((id) => parseInt(id, 10)).filter(Boolean)
       : [];
-    if (isSuperAdmin && !assignedIds.length) {
+    if (canAssignCompanies && !assignedIds.length) {
       alert('Select at least one company for this user.');
       return;
     }
@@ -10572,10 +10591,16 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
         role: editUserRole,
         password: editUserPassword || undefined,
       };
-      if (isSuperAdmin) {
+      if (canAssignCompanies) {
         payload.company_ids = assignedIds;
         if (editUserRole !== 'group_admin') {
           payload.company_id = assignedIds[0];
+          const companyRoles = {};
+          assignedIds.forEach((id) => {
+            const key = String(id);
+            companyRoles[key] = editCompanyRoles[key] || (editUserRole === 'admin' ? 'admin' : 'user');
+          });
+          payload.company_roles = companyRoles;
         }
       }
       await updateUser(editingUser.id, payload);
@@ -10584,6 +10609,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
       }
       setEditingUser(null);
       setEditAssignedCompanyIds([]);
+      setEditCompanyRoles({});
       alert('User updated successfully.');
     } catch (err) {
       showApiError('Updating user', err);
@@ -10620,29 +10646,16 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
     return ids.map((companyId) => companyNameFor(companyId)).join(', ');
   };
 
-  const renderCompanyMultiSelect = (selectedIds, onChange, inputId) => (
-    <div className="form-group">
-      <label htmlFor={inputId}>Assign to Companies* (hold Ctrl/Cmd to select multiple)</label>
-      <select
-        id={inputId}
-        multiple
-        className="form-input"
-        style={{ minHeight: '160px' }}
-        value={selectedIds}
-        onChange={(e) => {
-          onChange(Array.from(e.target.selectedOptions, (opt) => opt.value));
-        }}
-      >
-        {(companies || []).map((co) => (
-          <option key={co.id} value={String(co.id)}>{co.name}</option>
-        ))}
-      </select>
-      {selectedIds.length > 0 && (
-        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>
-          Selected ({selectedIds.length}): {selectedIds.map((id) => companyNameFor(id)).join(', ')}
-        </p>
-      )}
-    </div>
+  const renderCompanyAccessPicker = (selectedIds, onChangeIds, rolesByCompany, onChangeRole, inputId, showRoles = true) => (
+    <CompanyAccessPicker
+      companies={assignableCompanies}
+      selectedIds={selectedIds}
+      rolesByCompany={rolesByCompany}
+      onChangeIds={onChangeIds}
+      onChangeRole={onChangeRole}
+      showRoles={showRoles}
+      idPrefix={inputId}
+    />
   );
 
   // Logo file handler
@@ -10804,6 +10817,14 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
               <input className="form-input" value={newCompanyState} onChange={(e) => setNewCompanyState(e.target.value)} />
             </div>
           </div>
+          <UserAccessPicker
+            users={assignableUsersForNewCompany}
+            selectedIds={newCompanyUserIds}
+            rolesByUser={newCompanyUserRoles}
+            onChangeIds={setNewCompanyUserIds}
+            onChangeRole={(userId, role) => setNewCompanyUserRoles((prev) => ({ ...prev, [String(userId)]: role }))}
+            idPrefix="new-company-users"
+          />
           <button
             type="button"
             className="btn-primary"
@@ -10811,13 +10832,21 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
             onClick={async () => {
               setCompanyCreating(true);
               try {
+                const userRoles = {};
+                newCompanyUserIds.forEach((id) => {
+                  userRoles[String(id)] = newCompanyUserRoles[String(id)] || 'user';
+                });
                 await createCompany({
                   name: newCompanyName.trim(),
                   gstin: newCompanyGstin.trim() || null,
                   state: newCompanyState.trim() || 'Gujarat',
+                  user_ids: newCompanyUserIds.map((id) => parseInt(id, 10)).filter(Boolean),
+                  user_roles: userRoles,
                 });
                 setNewCompanyName('');
                 setNewCompanyGstin('');
+                setNewCompanyUserIds([]);
+                setNewCompanyUserRoles({});
                 alert('Company created successfully.');
               } catch (err) {
                 showApiError('Creating company', err);
@@ -11177,10 +11206,13 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                   <input className="form-input" value={editUserPassword} onChange={(e) => setEditUserPassword(e.target.value)} />
                 </div>
               </div>
-              {isSuperAdmin && renderCompanyMultiSelect(
+              {canAssignCompanies && renderCompanyAccessPicker(
                 editAssignedCompanyIds,
                 setEditAssignedCompanyIds,
-                'edit-user-companies'
+                editCompanyRoles,
+                (companyId, role) => setEditCompanyRoles((prev) => ({ ...prev, [String(companyId)]: role })),
+                'edit-user-companies',
+                editUserRole !== 'group_admin'
               )}
               <div className="btn-row">
                 <button
@@ -11189,6 +11221,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                   onClick={() => {
                     setEditingUser(null);
                     setEditAssignedCompanyIds([]);
+                    setEditCompanyRoles({});
                   }}
                 >
                   Cancel
@@ -11225,12 +11258,15 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                 </select>
               </div>
             </div>
-            {isSuperAdmin && renderCompanyMultiSelect(
+            {canAssignCompanies && renderCompanyAccessPicker(
               newAssignedCompanyIds,
               setNewAssignedCompanyIds,
-              'new-user-companies'
+              newCompanyRoles,
+              (companyId, role) => setNewCompanyRoles((prev) => ({ ...prev, [String(companyId)]: role })),
+              'new-user-companies',
+              newRole !== 'group_admin'
             )}
-            {!isSuperAdmin && activeCompany?.name && (
+            {!canAssignCompanies && activeCompany?.name && (
               <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
                 New users will be registered under <strong>{activeCompany.name}</strong>.
               </p>
@@ -11311,6 +11347,14 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                                 ? u.managed_company_ids
                                 : (u.company_id ? [u.company_id] : []);
                               setEditAssignedCompanyIds(ids.map(String));
+                              const roles = { ...(u.company_roles || {}) };
+                              ids.forEach((cid) => {
+                                const key = String(cid);
+                                if (!roles[key]) {
+                                  roles[key] = u.role === 'admin' ? 'admin' : 'user';
+                                }
+                              });
+                              setEditCompanyRoles(roles);
                             }}
                           >
                             Edit

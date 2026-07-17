@@ -1,5 +1,9 @@
+export function resolveUserRole(user) {
+  return user?.effective_role || user?.role;
+}
+
 export function isGroupAdmin(user) {
-  return user?.role === 'group_admin';
+  return resolveUserRole(user) === 'group_admin' || user?.role === 'group_admin';
 }
 
 export function canSwitchCompanies(user, companies = null) {
@@ -11,16 +15,18 @@ export function canSwitchCompanies(user, companies = null) {
 }
 
 export function isCompanyStaffAdmin(user) {
+  const role = resolveUserRole(user);
   return (
-    user?.role === 'admin'
-    || user?.role === 'super_admin'
-    || user?.role === 'trial_owner'
-    || user?.role === 'group_admin'
+    role === 'admin'
+    || role === 'super_admin'
+    || role === 'trial_owner'
+    || role === 'group_admin'
   );
 }
 
 export function isPortalCompanyAdmin(user) {
-  return user?.role === 'admin' || user?.role === 'group_admin';
+  const role = resolveUserRole(user);
+  return role === 'admin' || role === 'group_admin';
 }
 
 export function roleDisplayLabel(role) {
@@ -29,6 +35,20 @@ export function roleDisplayLabel(role) {
   if (role === 'trial_owner') return 'Free Trial';
   if (role === 'admin') return 'Admin Account';
   return `${role || 'user'} Account`;
+}
+
+/** Apply per-company pivot role onto the user object for the active company. */
+export function withEffectiveRoleForCompany(user, companyId) {
+  if (!user) return user;
+  if (user.role === 'super_admin' || user.role === 'group_admin' || user.role === 'trial_owner') {
+    return { ...user, effective_role: user.role };
+  }
+  const key = companyId != null ? String(companyId) : '';
+  const pivot = key ? (user.company_roles?.[key] || user.company_roles?.[companyId]) : null;
+  if (pivot === 'admin' || pivot === 'user') {
+    return { ...user, effective_role: pivot };
+  }
+  return { ...user, effective_role: user.role };
 }
 
 export function resolveAuthPhase({ currentUser, account, needsPassword }) {

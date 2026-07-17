@@ -50,7 +50,9 @@ class User extends Authenticatable
     /** Companies explicitly assigned (group admin or multi-company staff). */
     public function managedCompanies(): BelongsToMany
     {
-        return $this->belongsToMany(Company::class, 'user_companies')->withTimestamps();
+        return $this->belongsToMany(Company::class, 'user_companies')
+            ->withPivot('role')
+            ->withTimestamps();
     }
 
     public function isTrialOwner(): bool
@@ -78,14 +80,58 @@ class User extends Authenticatable
         return count($this->accessibleCompanyIds()) > 1;
     }
 
+    /**
+     * Role for the active (or given) company.
+     * Super/group/trial keep their global role; staff may have per-company admin|user on the pivot.
+     */
+    public function effectiveRole(?int $companyId = null): string
+    {
+        if ($this->isSuperAdmin() || $this->isGroupAdmin() || $this->isTrialOwner()) {
+            return (string) $this->role;
+        }
+
+        $companyId = $companyId ?? (\App\Support\TenantContext::getCompanyId());
+        if ($companyId && Schema::hasTable('user_companies') && Schema::hasColumn('user_companies', 'role')) {
+            $pivotRole = DB::table('user_companies')
+                ->where('user_id', $this->id)
+                ->where('company_id', $companyId)
+                ->value('role');
+            if (in_array($pivotRole, ['admin', 'user'], true)) {
+                return $pivotRole;
+            }
+        }
+
+        return (string) $this->role;
+    }
+
     public function isAdmin(): bool
     {
-        return in_array($this->role, ['super_admin', 'admin', 'trial_owner', 'group_admin'], true);
+        return in_array($this->effectiveRole(), ['super_admin', 'admin', 'trial_owner', 'group_admin'], true);
     }
 
     public function isCompanyStaffAdmin(): bool
     {
-        return in_array($this->role, ['admin', 'trial_owner', 'group_admin'], true);
+        return in_array($this->effectiveRole(), ['admin', 'trial_owner', 'group_admin'], true);
+    }
+
+    /** @return array<string, string> company_id => admin|user */
+    public function companyRolesMap(): array
+    {
+        if (! Schema::hasTable('user_companies')) {
+            return [];
+        }
+
+        $map = [];
+        $hasRole = Schema::hasColumn('user_companies', 'role');
+        $rows = DB::table('user_companies')->where('user_id', $this->id)->get();
+        foreach ($rows as $row) {
+            $role = $hasRole ? ($row->role ?? null) : null;
+            $map[(string) (int) $row->company_id] = in_array($role, ['admin', 'user'], true)
+                ? $role
+                : ($this->role === 'admin' ? 'admin' : 'user');
+        }
+
+        return $map;
     }
 
     /** @return list<int> */

@@ -4,6 +4,7 @@ import { getStoredToken, setStoredToken, getActiveCompanyId, setActiveCompanyId 
 import { portalApi } from '../services/portalApi';
 import { toAmount, normalizePortalBootstrapData } from '../utils/formatMoney';
 import { formatApiError, showApiError } from '../utils/apiErrors';
+import { withEffectiveRoleForCompany } from '../utils/roleHelpers';
 
 const SimulatorContext = createContext();
 
@@ -156,18 +157,24 @@ export const SimulatorProvider = ({ children }) => {
       return null;
     }
 
-    if (user.role !== 'super_admin' && user.role !== 'group_admin') {
-      const co = companyList[0];
-      setActiveCompany(co);
-      setActiveCompanyId(co.id);
-      return co;
+    const canPickCompany =
+      user.role === 'super_admin'
+      || user.role === 'group_admin'
+      || companyList.length > 1
+      || (user.managed_company_ids || []).length > 1;
+
+    let chosen;
+    if (!canPickCompany) {
+      chosen = companyList[0];
+    } else {
+      const savedId = getActiveCompanyId();
+      const match = companyList.find((c) => String(c.id) === String(savedId));
+      chosen = match || companyList[0];
     }
 
-    const savedId = getActiveCompanyId();
-    const match = companyList.find((c) => String(c.id) === String(savedId));
-    const chosen = match || companyList[0];
     setActiveCompany(chosen);
     setActiveCompanyId(chosen.id);
+    setCurrentUser((prev) => withEffectiveRoleForCompany(prev || user, chosen.id));
     return chosen;
   }, []);
 
@@ -269,6 +276,7 @@ export const SimulatorProvider = ({ children }) => {
     if (!company?.id) return;
     setActiveCompany(company);
     setActiveCompanyId(company.id);
+    setCurrentUser((prev) => withEffectiveRoleForCompany(prev, company.id));
     await refreshPortalData();
   }, [refreshPortalData]);
 
@@ -850,6 +858,7 @@ export const SimulatorProvider = ({ children }) => {
       password: userData.password || 'user123',
       company_id: userData.company_id ?? null,
       company_ids: userData.company_ids,
+      company_roles: userData.company_roles,
     });
     addConsoleLog('route', 'POST /api/settings/users', 'User credentials stored with bcrypt hash.');
     return res.user;
@@ -859,6 +868,7 @@ export const SimulatorProvider = ({ children }) => {
     const res = await portalApi.updateUser(userId, {
       ...userData,
       company_ids: userData.company_ids,
+      company_roles: userData.company_roles,
     });
     addConsoleLog('route', `PUT /api/settings/users/${userId}`, 'User profile updated.');
     return res.user;

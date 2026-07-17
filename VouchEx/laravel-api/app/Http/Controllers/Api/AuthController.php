@@ -211,6 +211,7 @@ class AuthController extends Controller
             'onboarding_step' => $user->onboarding_step,
             'created_at' => $user->created_at?->toIso8601String(),
             'managed_company_ids' => $managed,
+            'company_roles' => $user->isSuperAdmin() ? [] : $user->companyRolesMap(),
         ];
     }
 
