@@ -25,6 +25,15 @@ import {
 /** Align with GST Returns Offline Tool 3.2.x schema family. */
 const GSTR1_JSON_VERSION = 'GST3.2.2';
 
+/** Table-12 HSN B2B/B2C bifurcation applies from May 2025 return period (fp MMYYYY). */
+function shouldUseHsnBifurcation(fp) {
+  if (!fp || String(fp).length < 6) return true;
+  const mm = parseInt(String(fp).slice(0, 2), 10);
+  const yyyy = parseInt(String(fp).slice(2), 10);
+  if (!mm || !yyyy) return true;
+  return yyyy > 2025 || (yyyy === 2025 && mm >= 5);
+}
+
 function filterByFilingPeriod(records, fp) {
   if (!fp || fp.length < 6) return records;
   const mm = parseInt(fp.slice(0, 2), 10);
@@ -365,7 +374,7 @@ function aggregateHsn(invoices, invoiceItems, b2bOnly) {
     rt: a.rt,
   }));
 
-  return data.length ? { data } : undefined;
+  return data;
 }
 
 function buildDocIssueJson(invoices) {
@@ -459,13 +468,24 @@ export function buildGstr1PortalJson({
   if (exp.length) payload.exp = exp;
 
   const hsnB2b = aggregateHsn(periodInvoices, invoiceItems, true);
-  if (hsnB2b) payload.hsn_b2b = hsnB2b;
-
   const hsnB2c = aggregateHsn(periodInvoices, invoiceItems, false);
-  if (hsnB2c) payload.hsn_b2c = hsnB2c;
+
+  // GSTN schema (post Table-12 bifurcation): HSN lives under root "hsn" with
+  // hsn_b2b / hsn_b2c as ARRAYS — not top-level keys and not { data: [] }.
+  // Ref: GSTN Save GSTR-1 API sample + Offline Tool 3.2.x
+  const useHsnBifurcation = shouldUseHsnBifurcation(fp);
+  if (useHsnBifurcation) {
+    const hsn = {};
+    if (hsnB2b.length) hsn.hsn_b2b = hsnB2b;
+    if (hsnB2c.length) hsn.hsn_b2c = hsnB2c;
+    if (Object.keys(hsn).length) payload.hsn = hsn;
+  } else {
+    const combined = [...hsnB2b, ...hsnB2c].map((row, idx) => ({ ...row, num: idx + 1 }));
+    if (combined.length) payload.hsn = { data: combined };
+  }
 
   // GSTN Phase-3: if B2B invoices exist, Table-12 B2B HSN cannot be empty
-  if (b2b.length && !hsnB2b) {
+  if (b2b.length && !hsnB2b.length) {
     throw new Error(
       'GSTR-1 JSON: B2B invoices exist but HSN summary (Table 12 B2B) is empty. Add 4- or 6-digit HSN/SAC on B2B line items, then export again.'
     );
