@@ -4,6 +4,7 @@ import {
   formatGstJsonDate,
   formatPlaceOfSupplyCode,
   formatHsn6,
+  formatGstUqc,
   getInvoiceLines,
   getCreditNoteLines,
   groupLinesByRate,
@@ -21,6 +22,7 @@ import {
   gstr1PortalJsonFilename,
 } from './exportPeriod';
 
+/** Align with GST Returns Offline Tool 3.2.x schema family. */
 const GSTR1_JSON_VERSION = 'GST3.2.2';
 
 function filterByFilingPeriod(records, fp) {
@@ -34,9 +36,27 @@ function filterByFilingPeriod(records, fp) {
   });
 }
 
+/** GSTN rejects special characters in document numbers in some schema versions. */
+function sanitizeDocNo(value) {
+  return String(value || '')
+    .trim()
+    .replace(/[^\w\-\/]/g, '')
+    .slice(0, 16);
+}
+
+function requirePos(stateName, contextLabel) {
+  const pos = formatPlaceOfSupplyCode(stateName);
+  if (!/^\d{2}$/.test(pos)) {
+    throw new Error(
+      `Invalid Place of Supply for ${contextLabel}. Set a valid Indian state (2-digit GST state code required for portal JSON).`
+    );
+  }
+  return pos;
+}
+
 function buildItmDet(bucket) {
   const det = {
-    rt: bucket.rate,
+    rt: roundGst(bucket.rate),
     txval: roundGst(bucket.taxable),
   };
   if (bucket.igst > 0) {
@@ -86,15 +106,17 @@ function buildB2bJson(invoices, invoiceItems, companyState) {
     .filter((inv) => inv.status !== 'Cancelled' && isB2bInvoice(inv) && isValidGstin(inv.gstin) && !isExportInvoice(inv))
     .forEach((inv) => {
       const ctin = String(inv.gstin || '').trim().toUpperCase();
+      const itms = buildItms(invoiceRateBuckets(inv, invoiceItems, companyState));
+      if (!itms.length) return;
 
       const invEntry = {
-        inum: String(inv.invoice_number),
+        inum: sanitizeDocNo(inv.invoice_number),
         idt: formatGstJsonDate(inv.issue_date),
         val: roundGst(inv.total_amount),
-        pos: formatPlaceOfSupplyCode(inv.place_of_supply),
+        pos: requirePos(inv.place_of_supply, `invoice ${inv.invoice_number}`),
         rchrg: 'N',
         inv_typ: 'R',
-        itms: buildItms(invoiceRateBuckets(inv, invoiceItems, companyState)),
+        itms,
       };
 
       if (!byCtin.has(ctin)) byCtin.set(ctin, []);
@@ -110,10 +132,10 @@ function buildB2csJson(invoices, invoiceItems, companyState) {
   invoices
     .filter((inv) => inv.status !== 'Cancelled' && isB2cInvoice(inv) && !isExportInvoice(inv) && !isB2clInvoice(inv, companyState))
     .forEach((inv) => {
+      const pos = requirePos(inv.place_of_supply, `invoice ${inv.invoice_number}`);
       groupLinesByRate(getInvoiceLines(inv, invoiceItems), inv, companyState)
         .filter((b) => b.mechanism !== 'ECO')
         .forEach((b) => {
-          const pos = formatPlaceOfSupplyCode(inv.place_of_supply);
           const sply_ty = isIntraState(inv.place_of_supply, companyState) ? 'INTRA' : 'INTER';
           const key = `${pos}|${b.rate}|${sply_ty}`;
           if (!agg.has(key)) {
@@ -143,7 +165,7 @@ function buildB2csJson(invoices, invoiceItems, companyState) {
       sply_ty: a.sply_ty,
       typ: a.typ,
       pos: a.pos,
-      rt: a.rt,
+      rt: roundGst(a.rt),
       txval: roundGst(a.taxable),
     };
     if (a.sply_ty === 'INTER') row.iamt = roundGst(a.igst);
@@ -162,14 +184,14 @@ function buildB2clJson(invoices, invoiceItems, companyState) {
   invoices
     .filter((inv) => isB2clInvoice(inv, companyState))
     .forEach((inv) => {
-      const pos = formatPlaceOfSupplyCode(inv.place_of_supply);
+      const pos = requirePos(inv.place_of_supply, `invoice ${inv.invoice_number}`);
       const buckets = groupLinesByRate(getInvoiceLines(inv, invoiceItems), inv, companyState).filter(
         (b) => b.mechanism !== 'ECO'
       );
       if (!buckets.length) return;
 
       const invEntry = {
-        inum: String(inv.invoice_number),
+        inum: sanitizeDocNo(inv.invoice_number),
         idt: formatGstJsonDate(inv.issue_date),
         val: roundGst(inv.total_amount),
         itms: buildItms(buckets),
@@ -219,9 +241,9 @@ function buildCdnrJson(creditNotes, creditNoteItems, companyState) {
 
     const ntEntry = {
       ntty: 'C',
-      nt_num: String(cn.credit_note_number),
+      nt_num: sanitizeDocNo(cn.credit_note_number),
       nt_dt: formatGstJsonDate(cn.issue_date),
-      pos: formatPlaceOfSupplyCode(cn.place_of_supply || companyState),
+      pos: requirePos(cn.place_of_supply || companyState, `credit note ${cn.credit_note_number}`),
       rchrg: 'N',
       inv_typ: 'R',
       val: roundGst(cn.total_amount),
@@ -241,9 +263,9 @@ function buildCdnurJson(creditNotes, creditNoteItems, companyState) {
     .map((cn) => ({
       typ: 'B2CL',
       ntty: 'C',
-      nt_num: String(cn.credit_note_number),
+      nt_num: sanitizeDocNo(cn.credit_note_number),
       nt_dt: formatGstJsonDate(cn.issue_date),
-      pos: formatPlaceOfSupplyCode(cn.place_of_supply || companyState),
+      pos: requirePos(cn.place_of_supply || companyState, `credit note ${cn.credit_note_number}`),
       val: roundGst(cn.total_amount),
       itms: buildItms(creditNoteBuckets(cn, creditNoteItems, companyState)),
     }));
@@ -255,25 +277,31 @@ function buildExpJson(invoices, companyState) {
   invoices
     .filter((inv) => inv.status !== 'Cancelled' && isExportInvoice(inv))
     .forEach((inv) => {
-      const expTyp = inv.export_type || 'WPAY';
+      const expTyp = inv.export_type === 'WOPAY' || inv.export_treatment === 'LUT' || inv.export_treatment === 'Bond'
+        ? 'WOPAY'
+        : (inv.export_type || 'WPAY');
       const tax = bifurcateStoredTax(inv, inv.place_of_supply, companyState);
       const rate = toAmount(inv.tax_rate) || (tax.igst > 0 ? 18 : 0);
       const invEntry = {
-        inum: String(inv.invoice_number),
+        inum: sanitizeDocNo(inv.invoice_number),
         idt: formatGstJsonDate(inv.issue_date),
         val: roundGst(inv.total_amount),
-        sbpcode: inv.port_code || '',
-        sbnum: inv.shipping_bill_number ? String(inv.shipping_bill_number) : '',
-        sbdt: inv.shipping_bill_date ? formatGstJsonDate(inv.shipping_bill_date) : '',
         itms: [
           {
             txval: roundGst(inv.subtotal),
-            rt: rate,
+            rt: roundGst(rate),
             iamt: roundGst(tax.igst),
-            csamt: 0,
           },
         ],
       };
+
+      // Omit empty shipping-bill fields — empty strings fail GSTN schema validation
+      const port = String(inv.port_code || '').trim();
+      const sbnum = inv.shipping_bill_number ? String(inv.shipping_bill_number).trim() : '';
+      const sbdt = inv.shipping_bill_date ? formatGstJsonDate(inv.shipping_bill_date) : '';
+      if (port) invEntry.sbpcode = port;
+      if (sbnum) invEntry.sbnum = sbnum;
+      if (sbdt) invEntry.sbdt = sbdt;
 
       if (!byType.has(expTyp)) byType.set(expTyp, []);
       byType.get(expTyp).push(invEntry);
@@ -288,21 +316,24 @@ function aggregateHsn(invoices, invoiceItems, b2bOnly) {
   invoices
     .filter((inv) => {
       if (inv.status === 'Cancelled') return false;
+      if (isExportInvoice(inv)) return !b2bOnly; // exports roll into B2C HSN tab per GSTN advisory
       return b2bOnly ? isB2bInvoice(inv) : isB2cInvoice(inv);
     })
     .forEach((inv) => {
       getInvoiceLines(inv, invoiceItems).forEach((line) => {
         const hsn = formatHsn6(line.hsn_sac);
         if (!hsn) return;
-        const key = hsn;
+        const rt = roundGst(toAmount(line.tax_rate_override ?? line.tax_rate ?? 18));
+        const uqc = formatGstUqc(hsn, line.uom || line.unit || 'NOS');
+        const key = `${hsn}|${uqc}|${rt}`;
         if (!agg.has(key)) {
           agg.set(key, {
             hsn_sc: hsn,
-            desc: line.description || '',
-            uqc: 'NOS',
+            desc: String(line.description || '').slice(0, 30),
+            uqc,
             qty: 0,
             txval: 0,
-            rt: toAmount(line.tax_rate_override ?? 18),
+            rt,
             iamt: 0,
             camt: 0,
             samt: 0,
@@ -320,22 +351,19 @@ function aggregateHsn(invoices, invoiceItems, b2bOnly) {
       });
     });
 
-  const data = [...agg.values()].map((a, idx) => {
-    const row = {
-      num: idx + 1,
-      hsn_sc: a.hsn_sc,
-      desc: a.desc,
-      uqc: a.uqc,
-      qty: roundGst(a.qty),
-      txval: roundGst(a.txval),
-      rt: a.rt,
-    };
-    if (a.iamt > 0) row.iamt = roundGst(a.iamt);
-    if (a.camt > 0) row.camt = roundGst(a.camt);
-    if (a.samt > 0) row.samt = roundGst(a.samt);
-    if (a.csamt > 0) row.csamt = roundGst(a.csamt);
-    return row;
-  });
+  const data = [...agg.values()].map((a, idx) => ({
+    num: idx + 1,
+    hsn_sc: a.hsn_sc,
+    desc: a.desc || a.hsn_sc,
+    uqc: a.uqc || 'NOS',
+    qty: roundGst(a.qty),
+    txval: roundGst(a.txval),
+    iamt: roundGst(a.iamt),
+    camt: roundGst(a.camt),
+    samt: roundGst(a.samt),
+    csamt: roundGst(a.csamt),
+    rt: a.rt,
+  }));
 
   return data.length ? { data } : undefined;
 }
@@ -352,8 +380,8 @@ function buildDocIssueJson(invoices) {
         docs: [
           {
             num: 1,
-            from: String(sorted[0].invoice_number),
-            to: String(sorted[sorted.length - 1].invoice_number),
+            from: sanitizeDocNo(sorted[0].invoice_number),
+            to: sanitizeDocNo(sorted[sorted.length - 1].invoice_number),
             totnum: sorted.length,
             cancel: invoices.filter((inv) => inv.status === 'Cancelled').length,
             net_issue: active.length,
@@ -373,7 +401,8 @@ function computeGrandTotal(invoices, creditNotes) {
 }
 
 function downloadJson(payload, filename) {
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+  // Compact JSON — matches Offline Tool output and avoids schema edge cases with formatting
+  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -396,11 +425,17 @@ export function buildGstr1PortalJson({
   const fp = filingPeriod || deriveSingleFilingPeriod(invoices, creditNotes || []);
   const periodInvoices = filterByFilingPeriod(invoices, fp);
   const periodCreditNotes = filterByFilingPeriod(creditNotes || [], fp);
+  const gstin = (companyDetails.gstin || '').trim().toUpperCase();
+
+  if (!isValidGstin(gstin)) {
+    throw new Error('Company GSTIN must be a valid 15-character GSTIN for GSTR-1 portal JSON.');
+  }
 
   const payload = {
-    version: GSTR1_JSON_VERSION,
-    gstin: (companyDetails.gstin || '').trim().toUpperCase(),
+    gstin,
     fp,
+    version: GSTR1_JSON_VERSION,
+    hash: 'hash',
     gt: computeGrandTotal(periodInvoices, periodCreditNotes),
     cur_gt: computeGrandTotal(periodInvoices, periodCreditNotes),
   };
@@ -428,6 +463,13 @@ export function buildGstr1PortalJson({
 
   const hsnB2c = aggregateHsn(periodInvoices, invoiceItems, false);
   if (hsnB2c) payload.hsn_b2c = hsnB2c;
+
+  // GSTN Phase-3: if B2B invoices exist, Table-12 B2B HSN cannot be empty
+  if (b2b.length && !hsnB2b) {
+    throw new Error(
+      'GSTR-1 JSON: B2B invoices exist but HSN summary (Table 12 B2B) is empty. Add 6-digit HSN/SAC on B2B line items, then export again.'
+    );
+  }
 
   const doc_issue = buildDocIssueJson(periodInvoices);
   if (doc_issue) payload.doc_issue = doc_issue;

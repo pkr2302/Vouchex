@@ -101,15 +101,27 @@ export function formatPlaceOfSupply(stateName) {
   return trimmed;
 }
 
-/** GST portal JSON expects 2-digit state code only (e.g. "24"). */
+/** GST portal JSON expects 2-digit state code only (e.g. "24"). Returns '' if unknown. */
 export function formatPlaceOfSupplyCode(stateName) {
   if (!stateName) return '';
-  const trimmed = stateName.trim();
+  const trimmed = String(stateName).trim();
   if (GST_STATE_CODES[trimmed]) return GST_STATE_CODES[trimmed];
   if (/^\d{2}$/.test(trimmed)) return trimmed;
-  const prefixed = trimmed.match(/^(\d{2})-/);
+  const prefixed = trimmed.match(/^(\d{2})(?:-|$)/);
   if (prefixed) return prefixed[1];
-  return trimmed;
+  // Do not return free-text state names — GSTN schema requires ^[0-9]{2}$
+  const byLower = Object.entries(GST_STATE_CODES).find(([name]) => name.toLowerCase() === trimmed.toLowerCase());
+  return byLower ? byLower[1] : '';
+}
+
+/** Offline-tool UQC: services (HSN 99*) use NA; goods use NOS. */
+export function formatGstUqc(hsnOrUqc, fallback = 'NOS') {
+  const hsn = String(hsnOrUqc || '').replace(/\D/g, '');
+  if (hsn.startsWith('99')) return 'NA';
+  const u = String(fallback || 'NOS').trim().toUpperCase();
+  if (!u || u === 'NA') return hsn.startsWith('99') ? 'NA' : 'NOS';
+  // Offline tool accepts code or CODE-DESCRIPTION; prefer short code for JSON
+  return u.includes('-') ? u.split('-')[0] : u;
 }
 
 /** B2B HSN must be at least 6 digits. */
@@ -191,10 +203,18 @@ export function isB2cInvoice(inv) {
   return !isB2bInvoice(inv) && !isExportInvoice(inv);
 }
 
-/** B2CL: unregistered, inter-state, invoice value > ₹2.5 lakh. */
+/** B2CL: unregistered, inter-state, invoice value above threshold (₹2.5L till Jul-2024, ₹1L from Aug-2024). */
+export function getB2clThreshold(invoiceDate) {
+  const d = localDateFromCalendar(invoiceDate);
+  if (!d) return 100000;
+  // GSTN: B2C large limit reduced to ₹1 lakh from August 2024 return period.
+  const cutoff = new Date(2024, 7, 1); // 1 Aug 2024
+  return d < cutoff ? 250000 : 100000;
+}
+
 export function isB2clInvoice(inv, companyState) {
   if (inv.status === 'Cancelled' || isExportInvoice(inv) || isB2bInvoice(inv)) return false;
-  if (toAmount(inv.total_amount) <= 250000) return false;
+  if (toAmount(inv.total_amount) <= getB2clThreshold(inv.issue_date)) return false;
   return !isIntraState(inv.place_of_supply, companyState);
 }
 
