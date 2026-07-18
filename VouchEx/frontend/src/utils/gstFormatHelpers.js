@@ -124,11 +124,23 @@ export function formatGstUqc(hsnOrUqc, fallback = 'NOS') {
   return u.includes('-') ? u.split('-')[0] : u;
 }
 
-/** B2B HSN must be at least 6 digits. */
-export function formatHsn6(hsn) {
+/**
+ * Normalize HSN/SAC for GSTR-1.
+ * GSTN accepts 4-digit (AATO ≤ ₹5 Cr) or 6/8-digit codes — do not zero-pad 4-digit HSN to 6.
+ */
+export function formatHsnCode(hsn) {
   const raw = String(hsn || '').replace(/\D/g, '');
   if (!raw) return '';
-  return raw.length >= 6 ? raw.slice(0, 8) : raw.padStart(6, '0');
+  if (raw.length < 4) return ''; // below minimum reportable length
+  if (raw.length === 4 || raw.length === 6 || raw.length === 8) return raw;
+  if (raw.length === 5) return raw.padStart(6, '0');
+  if (raw.length === 7) return raw.slice(0, 6);
+  return raw.slice(0, 8);
+}
+
+/** @deprecated Prefer formatHsnCode — kept for existing imports; supports 4/6/8 digit HSN. */
+export function formatHsn6(hsn) {
+  return formatHsnCode(hsn);
 }
 
 export function getInvoiceLines(inv, invoiceItems) {

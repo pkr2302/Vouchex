@@ -82,7 +82,7 @@ export function TaxExportModal({
         {forTally
           ? 'Choose the file format required by your accounting software for voucher import.'
           : gstrFormat === 'json'
-            ? 'Creates a GSTR-1 JSON (version GST3.2.2) for GST portal upload. Path: Returns → GSTR-1 → Prepare Offline → Upload. Filter Taxation to one month first. B2B lines need 6-digit HSN/SAC. Do not upload the Excel workbook as JSON.'
+            ? 'Creates a GSTR-1 JSON (version GST3.2.2) for GST portal upload. Path: Returns → GSTR-1 → Prepare Offline → Upload. Filter Taxation to one month first. B2B lines need HSN/SAC (4 or 6 digits as applicable). Do not upload the Excel workbook as JSON.'
             : 'Generates a multi-sheet GSTR-1 workbook (B2B, B2CS, B2CL, CDNR, CDNUR, HSN, documents, exports, e-commerce) for import into the GST Returns Offline Tool — not for direct portal JSON upload.'}
       </p>
 

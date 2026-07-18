@@ -467,7 +467,7 @@ export function buildGstr1PortalJson({
   // GSTN Phase-3: if B2B invoices exist, Table-12 B2B HSN cannot be empty
   if (b2b.length && !hsnB2b) {
     throw new Error(
-      'GSTR-1 JSON: B2B invoices exist but HSN summary (Table 12 B2B) is empty. Add 6-digit HSN/SAC on B2B line items, then export again.'
+      'GSTR-1 JSON: B2B invoices exist but HSN summary (Table 12 B2B) is empty. Add 4- or 6-digit HSN/SAC on B2B line items, then export again.'
     );
   }
 
