@@ -595,15 +595,15 @@ export function InlineInventoryModal({ open, onClose, onCreated }) {
   );
 }
 
-export function LineItemTaxRow({ line, index, onChange, onRemove, canRemove, placeOfSupply, companyState, inventory, documentCurrency = 'INR' }) {
+export function LineItemTaxRow({ line, index, onChange, onRemove, canRemove, placeOfSupply, companyState, inventory, documentCurrency = 'INR', dense = false }) {
   const handle = (field, value) => onChange(index, field, value);
   const isManual = !line.product_id || line.product_id === '';
   const serviceLine = isServiceLine(line, inventory);
 
   return (
-    <tr className="line-item-row">
+    <tr className={`line-item-row${dense ? ' line-item-row--dense' : ''}`}>
       <td className="line-item-cell" data-label="Product">
-        <div className={`combo-inline-field combo-inline-field--table${isManual ? ' combo-inline-field--manual' : ''}`}>
+        <div className={`combo-inline-field combo-inline-field--table${isManual ? ' combo-inline-field--manual' : ''}${dense ? ' combo-inline-field--dense' : ''}`}>
           <select
             className="form-input combo-select-part"
             value={isManual ? MANUAL_SELECT_VALUE : String(line.product_id || '')}
@@ -629,7 +629,7 @@ export function LineItemTaxRow({ line, index, onChange, onRemove, canRemove, pla
               </option>
             ))}
           </select>
-          {isManual && (
+          {isManual && !dense && (
             <input
               className="form-input combo-manual-part"
               placeholder="Type item name…"
@@ -640,18 +640,38 @@ export function LineItemTaxRow({ line, index, onChange, onRemove, canRemove, pla
         </div>
       </td>
       <td className="line-item-cell" data-label="Description">
-        <input
-          className="form-input"
-          placeholder="Description *"
-          value={line.description}
-          onChange={(e) => handle('description', e.target.value)}
-        />
-        <input
-          className="form-input line-item-subfield"
-          placeholder="Detail (optional)"
-          value={line.item_detail || ''}
-          onChange={(e) => handle('item_detail', e.target.value)}
-        />
+        {dense ? (
+          <div className="line-item-desc-dense">
+            <input
+              className="form-input"
+              placeholder="Description *"
+              value={line.description}
+              onChange={(e) => handle('description', e.target.value)}
+            />
+            <input
+              className="form-input line-item-subfield"
+              placeholder="Detail"
+              value={line.item_detail || ''}
+              onChange={(e) => handle('item_detail', e.target.value)}
+              title="Optional detail"
+            />
+          </div>
+        ) : (
+          <>
+            <input
+              className="form-input"
+              placeholder="Description *"
+              value={line.description}
+              onChange={(e) => handle('description', e.target.value)}
+            />
+            <input
+              className="form-input line-item-subfield"
+              placeholder="Detail (optional)"
+              value={line.item_detail || ''}
+              onChange={(e) => handle('item_detail', e.target.value)}
+            />
+          </>
+        )}
       </td>
       <td className="line-item-cell" data-label="HSN/SAC">
         <input className="form-input" placeholder="HSN/SAC" value={line.hsn_sac} onChange={(e) => handle('hsn_sac', e.target.value)} />

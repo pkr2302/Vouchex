@@ -34,6 +34,7 @@ import {
   Upload,
   FileJson,
   FileText,
+  Sparkles,
 } from 'lucide-react';
 import { portalApi } from './services/portalApi';
 import {
@@ -1708,9 +1709,9 @@ function SalesInvoicesSubTab() {
 
   return (
     <div>
-      <div className="table-header-row">
-        <h3>Sales Registry</h3>
-        {!showAddForm && (
+      {!showAddForm && (
+        <div className="table-header-row">
+          <h3>Sales Registry</h3>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
               className="btn-primary"
@@ -1742,8 +1743,8 @@ function SalesInvoicesSubTab() {
               <FileSpreadsheet size={14} /> Export Excel 📊
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <InlineCustomerModal
         open={showInlineCustomer}
@@ -1757,77 +1758,26 @@ function SalesInvoicesSubTab() {
       />
 
       {showAddForm ? (
-        <form ref={invoiceFormRef} onSubmit={handleSaveInvoice} noValidate className="master-form" style={{ marginBottom: '30px' }}>
-          <div className="table-header-row" style={{ marginBottom: 16 }}>
-            <h3 className="form-section-title" style={{ margin: 0 }}>
-              {editingInvoiceId ? `Edit Sales Invoice — ${invoiceNumberInput}` : 'New Sales Invoice Billing Sheet'}
-            </h3>
-            <button type="button" className="btn-secondary" onClick={resetInvoiceForm}>
-              ← Back to Registry
-            </button>
-          </div>
-          
-          {/* TOP CONFIG BAR & OCR */}
-          <div className="invoice-creator-layout" style={{ marginBottom: '24px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div className="form-grid-3">
-                <div className="form-group">
-                  <label>Invoice Category Type</label>
-                  <select
-                    className="form-input"
-                    value={invoiceType}
-                    onChange={(e) => setInvoiceType(e.target.value)}
-                  >
-                    <option value="B2B">Business to Business (B2B)</option>
-                    <option value="B2C">Business to Consumer (B2C)</option>
-                    <option value="Export">Overseas Export (Export)</option>
-                    <option value="Exempt">Exempt / Nil Rated Supply</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Invoice Reference Number</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={invoiceNumberInput}
-                    onChange={(e) => {
-                      invoiceNumberUserEditedRef.current = true;
-                      setInvoiceNumberInput(e.target.value);
-                    }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <Req>Select customer from master</Req>
-                  <select
-                    className="form-input"
-                    value={selectedCustomerId}
-                    onChange={(e) => setSelectedCustomerId(e.target.value)}
-                  >
-                    <option value="">-- Click to choose client --</option>
-                    {customers.map(c => (
-                      <option key={c.id} value={String(c.id)}>{c.name} ({c.gst_type})</option>
-                    ))}
-                  </select>
-                  <button type="button" className="btn-secondary-sm" style={{ marginTop: 8 }} onClick={() => setShowInlineCustomer(true)}>
-                    + Add New Profile
-                  </button>
-                </div>
+        <form ref={invoiceFormRef} onSubmit={handleSaveInvoice} noValidate className="master-form billing-sheet billing-sheet--wonder">
+          <div className="billing-sheet__toolbar">
+            <div className="billing-sheet__heading">
+              <span className="billing-sheet__mark" aria-hidden="true" />
+              <div>
+                <p className="billing-sheet__kicker">Sales ledger</p>
+                <h3 className="billing-sheet__title">
+                  {editingInvoiceId ? 'Edit invoice' : 'New sales invoice'}
+                </h3>
               </div>
+              <span className="billing-sheet__doc-badge" title="Invoice number">
+                {invoiceNumberInput || '—'}
+              </span>
             </div>
-
-            {/* SCANNER EMULATION CONTAINER */}
-            <div className="scanner-card">
-              <h4 style={{ fontSize: '13px', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>AI Invoice Scanned Auto-Fill</span>
-                <span style={{ fontSize: '10px', color: 'var(--accent-teal)' }}>Upload any invoice image or PDF</span>
-              </h4>
-              <input 
-                type="file" 
-                ref={invoiceFileRef} 
-                style={{ display: 'none' }} 
-                accept="image/*,application/pdf" 
+            <div className="billing-sheet__toolbar-actions">
+              <input
+                type="file"
+                ref={invoiceFileRef}
+                style={{ display: 'none' }}
+                accept="image/*,application/pdf"
                 onChange={(e) => {
                   if (e.target.files && e.target.files[0]) {
                     setUploadedInvoiceFile(e.target.files[0]);
@@ -1835,286 +1785,305 @@ function SalesInvoicesSubTab() {
                   }
                 }}
               />
-              <div 
-                className="scanner-dropzone" 
-                onClick={() => invoiceFileRef.current.click()}
-                style={{ borderStyle: uploadedInvoiceFile ? 'solid' : 'dashed', borderColor: uploadedInvoiceFile ? 'var(--accent-teal)' : '' }}
+              <button
+                type="button"
+                className={`billing-sheet__scan-btn${uploadedInvoiceFile ? ' is-ready' : ''}`}
+                onClick={() => (uploadedInvoiceFile && !isScanning ? triggerInvoiceScan() : invoiceFileRef.current.click())}
+                title={uploadedInvoiceFile ? uploadedInvoiceFile.name : 'Upload invoice to auto-fill'}
               >
-                <FileSpreadsheet style={{ color: uploadedInvoiceFile ? 'var(--accent-teal)' : 'var(--text-muted)' }} />
-                {uploadedInvoiceFile ? (
-                  <>
-                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-primary)' }}>File: {uploadedInvoiceFile.name}</span>
-                    <span style={{ fontSize: '9px', color: 'var(--accent-teal)' }}>Ready for parsing! Click to change file.</span>
-                  </>
-                ) : (
-                  <>
-                    <span style={{ fontSize: '11px', fontWeight: 'bold' }}>Upload Invoice (PDF/Image)</span>
-                    <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Click to select or drag document here</span>
-                  </>
-                )}
-              </div>
+                <Sparkles size={13} />
+                {isScanning ? `${scanProgress}%` : uploadedInvoiceFile ? 'Run OCR' : 'AI Scan'}
+              </button>
               {uploadedInvoiceFile && !isScanning && (
-                <button 
-                  type="button" 
-                  className="btn-primary" 
-                  style={{ width: '100%', marginTop: '10px', height: '36px', fontSize: '12px' }}
-                  onClick={triggerInvoiceScan}
+                <button
+                  type="button"
+                  className="billing-sheet__scan-clear"
+                  onClick={() => { setUploadedInvoiceFile(null); setScanError(''); if (invoiceFileRef.current) invoiceFileRef.current.value = ''; }}
                 >
-                  Run AI OCR Scan ⚡
+                  ×
                 </button>
               )}
-              {isScanning && (
-                <div className="scanner-progress-container">
-                  <div className="scanner-progress-bar">
-                    <div className="scanner-progress-fill" style={{ width: `${scanProgress}%` }}></div>
-                  </div>
-                  <pre className="scanner-ocr-text"><code>{ocrFeed}</code></pre>
-                </div>
-              )}
-              {scanError && (
-                <span style={{ color: 'var(--accent-red)', fontSize: '10px', fontWeight: 'bold' }}>{scanError}</span>
-              )}
+              <button type="button" className="btn-secondary billing-sheet__back" onClick={resetInvoiceForm}>
+                ← Registry
+              </button>
             </div>
           </div>
+          {isScanning && (
+            <div className="billing-sheet__scan-progress">
+              <div className="scanner-progress-bar">
+                <div className="scanner-progress-fill" style={{ width: `${scanProgress}%` }}></div>
+              </div>
+              <pre className="scanner-ocr-text"><code>{ocrFeed}</code></pre>
+            </div>
+          )}
+          {scanError && <span className="billing-sheet__scan-error">{scanError}</span>}
 
-          {/* DYNAMIC FORM SECTION */}
-          <div className="form-section-title">Billing Meta details</div>
-          <div className="form-grid-4">
-            <div className="form-group">
-              <Req>Invoice Issue Date</Req>
-              <input type="date" className="form-input" value={dateOnly(issueDate)} onChange={(e) => setIssueDate(dateOnly(e.target.value))} />
-            </div>
-            <div className="form-group">
-              <Opt>Calculated Due Date</Opt>
-              <input
-                type="date"
-                className="form-input"
-                value={dateOnly(dueDate)}
-                onChange={(e) => {
-                  dueDateUserEditedRef.current = true;
-                  setDueDate(dateOnly(e.target.value));
-                }}
-              />
-            </div>
-            <div className="form-group">
-              <Opt>Purchase Order (PO) No.</Opt>
-              <input type="text" className="form-input" placeholder="PO-XXXX" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} />
-            </div>
-          </div>
-          <div className="form-grid-3">
-            <PlaceOfSupplyCountrySelect
-              placeOfSupply={placeOfSupply}
-              exportCountry={exportCountry}
-              onPlaceChange={setPlaceOfSupply}
-              onExportCountryChange={setExportCountry}
-              onSuggestCurrency={setCurrency}
-            />
-            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 500 }}>
-                <input
-                  type="checkbox"
-                  checked={printPlaceOfSupplyOnPdf}
-                  onChange={(e) => setPrintPlaceOfSupplyOnPdf(e.target.checked)}
-                />
-                Print place of supply on invoice PDF
-              </label>
-            </div>
-            <CurrencySelect label="Invoice currency" value={currency} onChange={setCurrency} required />
-            {currency !== 'INR' && (
+          <div className="billing-sheet__ledger-head">
+            <div className="billing-sheet__row billing-sheet__row--id">
               <div className="form-group">
-                {fcConversionRequired ? <Req>Conversion rate to INR</Req> : <Opt>Conversion rate to INR</Opt>}
+                <label>Category</label>
+                <select className="form-input" value={invoiceType} onChange={(e) => setInvoiceType(e.target.value)}>
+                  <option value="B2B">B2B</option>
+                  <option value="B2C">B2C</option>
+                  <option value="Export">Export</option>
+                  <option value="Exempt">Exempt / Nil</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Invoice No.</label>
                 <input
-                  type="number"
-                  min="0"
-                  step="0.000001"
+                  type="text"
                   className="form-input"
-                  value={conversionRate}
-                  onChange={(e) => setConversionRate(e.target.value)}
-                  placeholder="e.g. 83.50"
+                  value={invoiceNumberInput}
+                  onChange={(e) => {
+                    invoiceNumberUserEditedRef.current = true;
+                    setInvoiceNumberInput(e.target.value);
+                  }}
                 />
-                <RbiReferenceRateHint
-                  currency={currency}
-                  date={issueDate}
-                  onUseRate={setConversionRate}
+              </div>
+              <div className="form-group billing-sheet__customer-group">
+                <Req>Customer</Req>
+                <div className="billing-sheet__customer">
+                  <select
+                    className="form-input"
+                    value={selectedCustomerId}
+                    onChange={(e) => setSelectedCustomerId(e.target.value)}
+                  >
+                    <option value="">Choose client…</option>
+                    {customers.map(c => (
+                      <option key={c.id} value={String(c.id)}>{c.name} ({c.gst_type})</option>
+                    ))}
+                  </select>
+                  <button type="button" className="btn-secondary-sm" onClick={() => setShowInlineCustomer(true)}>+ New</button>
+                </div>
+              </div>
+              <div className="form-group">
+                <Req>Issue</Req>
+                <input type="date" className="form-input" value={dateOnly(issueDate)} onChange={(e) => setIssueDate(dateOnly(e.target.value))} />
+              </div>
+              <div className="form-group">
+                <Opt>Due</Opt>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={dateOnly(dueDate)}
+                  onChange={(e) => {
+                    dueDateUserEditedRef.current = true;
+                    setDueDate(dateOnly(e.target.value));
+                  }}
                 />
-                <p className="form-hint">
-                  Line amounts and tax are in {formatCurrencyLabel(currency)}.
-                  {fcConversionRequired ? ' Rate required for GST reporting in INR.' : ' Optional when no GST is payable (e.g. LUT export).'}
-                </p>
+              </div>
+              <div className="form-group">
+                <Opt>PO</Opt>
+                <input type="text" className="form-input" placeholder="PO-XXXX" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="billing-sheet__row billing-sheet__row--meta">
+              <div className="billing-sheet__pos">
+                <PlaceOfSupplyCountrySelect
+                  placeOfSupply={placeOfSupply}
+                  exportCountry={exportCountry}
+                  onPlaceChange={setPlaceOfSupply}
+                  onExportCountryChange={setExportCountry}
+                  onSuggestCurrency={setCurrency}
+                />
+              </div>
+              <CurrencySelect label="Currency" value={currency} onChange={setCurrency} required />
+              <div className="form-group">
+                {customers.find((c) => sameId(c.id, selectedCustomerId)) && isGstRegisteredType(customers.find((c) => sameId(c.id, selectedCustomerId)).gst_type) ? (
+                  <Req>GSTIN</Req>
+                ) : (
+                  <Opt>GSTIN</Opt>
+                )}
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="24AAAAC1234F1Z8"
+                  value={clientTaxId}
+                  onChange={(e) => setClientTaxId(e.target.value)}
+                />
+              </div>
+              <div className="form-group billing-sheet__check-wrap">
+                <label className="billing-sheet__check">
+                  <input
+                    type="checkbox"
+                    checked={printPlaceOfSupplyOnPdf}
+                    onChange={(e) => setPrintPlaceOfSupplyOnPdf(e.target.checked)}
+                  />
+                  Print POS
+                </label>
+              </div>
+              <div className="form-group billing-sheet__addr-field">
+                <label>Billing</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={billingAddress}
+                  onChange={(e) => setBillingAddress(e.target.value)}
+                  placeholder="Street, city, state, PIN"
+                />
+              </div>
+              <div className="form-group billing-sheet__addr-field">
+                <label>Shipping</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={shippingAddress}
+                  onChange={(e) => setShippingAddress(e.target.value)}
+                  placeholder="Street, city, state, PIN"
+                />
+              </div>
+            </div>
+
+            {currency !== 'INR' && (
+              <div className="billing-sheet__row billing-sheet__row--2">
+                <div className="form-group">
+                  {fcConversionRequired ? <Req>Conversion rate to INR</Req> : <Opt>Conversion rate to INR</Opt>}
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.000001"
+                    className="form-input"
+                    value={conversionRate}
+                    onChange={(e) => setConversionRate(e.target.value)}
+                    placeholder="e.g. 83.50"
+                  />
+                  <RbiReferenceRateHint currency={currency} date={issueDate} onUseRate={setConversionRate} />
+                </div>
+              </div>
+            )}
+
+            {isExportPlaceOfSupply(placeOfSupply) && (
+              <div className="billing-sheet__row billing-sheet__row--2">
+                <div className="form-group">
+                  <Req>Export GST treatment</Req>
+                  <select className="form-input" value={exportTreatment} onChange={(e) => setExportTreatment(e.target.value)}>
+                    <option value="">Select LUT / Bond / IGST…</option>
+                    {EXPORT_TREATMENT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                {exportCountry && (
+                  <div className="form-group">
+                    <label>Destination</label>
+                    <input type="text" className="form-input" value={exportCountry} readOnly />
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          {isExportPlaceOfSupply(placeOfSupply) && (
-            <div className="form-grid-2" style={{ marginBottom: 12 }}>
-              <div className="form-group">
-                <Req>Export supply treatment (GST)</Req>
-                <select className="form-input" value={exportTreatment} onChange={(e) => setExportTreatment(e.target.value)}>
-                  <option value="">-- Select LUT / Bond / IGST treatment --</option>
-                  {EXPORT_TREATMENT_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-                <p className="form-hint">LUT / Bond selections zero-rate IGST on the invoice. &quot;With payment of IGST&quot; applies export IGST in {formatCurrencyLabel(currency)}.</p>
-              </div>
-              {exportCountry && (
-                <div className="form-group">
-                  <label>Destination country</label>
-                  <input type="text" className="form-input" value={exportCountry} readOnly />
+          <div className="billing-sheet__workspace">
+            <div className="billing-sheet__items-pane">
+              <div className="billing-sheet__items-head">
+                <h4 className="billing-sheet__section">Line items</h4>
+                <div className="billing-sheet__items-tools">
+                  <button type="button" className="btn-secondary-sm" onClick={() => setShowInlineInventory(true)}>+ Item master</button>
+                  <button type="button" className="btn-secondary-sm billing-sheet__add-inline" onClick={addLineItem}>
+                    <Plus size={13} /> Add row
+                  </button>
                 </div>
-              )}
+              </div>
+              <div className="invoice-items-scroll">
+                <table className="invoice-items-table">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Description</th>
+                      <th>HSN/SAC</th>
+                      <th>Qty</th>
+                      <th>Rate ({curSym})</th>
+                      <th>GST %</th>
+                      <th>Supply</th>
+                      <th>Tax ({curSym})</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineItems.map((item, idx) => (
+                      <LineItemTaxRow
+                        key={idx}
+                        line={item}
+                        index={idx}
+                        onChange={handleLineItemChange}
+                        onRemove={removeLineItem}
+                        canRemove={lineItems.length > 1}
+                        placeOfSupply={placeOfSupply}
+                        companyState={registeredState}
+                        inventory={inventory}
+                        documentCurrency={currency}
+                        dense
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          )}
 
-          <div className="form-grid-3">
-            <div className="form-group">
-              <label>Billing Destination Address</label>
-              <textarea
-                className="form-input"
-                style={{ height: '70px', resize: 'none' }}
-                value={billingAddress}
-                onChange={(e) => setBillingAddress(e.target.value)}
-                placeholder="Billing Street, City, State, Pincode"
-              />
-            </div>
-            <div className="form-group">
-              <label>Shipping Destination Address</label>
-              <textarea
-                className="form-input"
-                style={{ height: '70px', resize: 'none' }}
-                value={shippingAddress}
-                onChange={(e) => setShippingAddress(e.target.value)}
-                placeholder="Shipping Street, City, State, Pincode"
-              />
-            </div>
-            <div className="form-group">
-              {customers.find((c) => sameId(c.id, selectedCustomerId)) && isGstRegisteredType(customers.find((c) => sameId(c.id, selectedCustomerId)).gst_type) ? (
-                <Req>Client Tax ID (GSTIN)</Req>
-              ) : (
-                <Opt>Client Tax ID (GSTIN)</Opt>
-              )}
-              <input
-                type="text"
-                className="form-input"
-                placeholder="e.g. 24AAAAC1234F1Z8"
-                value={clientTaxId}
-                onChange={(e) => setClientTaxId(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* ITEM LINE SECTIONS */}
-          <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Itemized Line Items (The Invoice Body)</span>
-            <button type="button" className="btn-secondary-sm" onClick={() => setShowInlineInventory(true)}>+ Add New Item</button>
-          </div>
-          <div className="invoice-items-scroll">
-            <table className="invoice-items-table">
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Description</th>
-                  <th>HSN/SAC</th>
-                  <th>Qty</th>
-                  <th>Rate ({curSym})</th>
-                  <th>GST %</th>
-                  <th>Supply</th>
-                  <th>CGST/SGST/IGST ({curSym})</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {lineItems.map((item, idx) => (
-                  <LineItemTaxRow
-                    key={idx}
-                    line={item}
-                    index={idx}
-                    onChange={handleLineItemChange}
-                    onRemove={removeLineItem}
-                    canRemove={lineItems.length > 1}
-                    placeOfSupply={placeOfSupply}
-                    companyState={registeredState}
-                    inventory={inventory}
-                    documentCurrency={currency}
+            <aside className="billing-sheet__settle">
+              <p className="billing-sheet__settle-label">Settlement</p>
+              <div className="billing-sheet__settle-total">
+                <span>Total due</span>
+                <strong style={{ color: 'var(--accent-teal)' }}>{docMoney(totalAmount)}</strong>
+                <em>{currency}</em>
+              </div>
+              <div className="invoice-calculations billing-sheet__totals">
+                <div className="calc-row">
+                  <span>Subtotal</span>
+                  <span className="calc-val">{docMoney(subtotal)}</span>
+                </div>
+                <div className="calc-row">
+                  <span>Discount</span>
+                  <AmountInput
+                    className="form-input"
+                    style={{ width: '84px', padding: '3px 5px', textAlign: 'right' }}
+                    value={discountValue}
+                    onChange={setDiscountValue}
                   />
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <button
-            type="button"
-            className="btn-secondary"
-            style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}
-            onClick={addLineItem}
-          >
-            <Plus size={16} /> Add Item Row
-          </button>
-
-          {/* CALCULATIONS AND DISCOUNT */}
-          <div className="invoice-calculations">
-            <div className="calc-row">
-              <span>Subtotal ({currency}):</span>
-              <span className="calc-val">{docMoney(subtotal)}</span>
-            </div>
-            <div className="calc-row">
-              <span>Deductions / Discount:</span>
-              <AmountInput
-                className="form-input"
-                style={{ width: '120px', padding: '6px', textAlign: 'right' }}
-                value={discountValue}
-                onChange={setDiscountValue}
-              />
-            </div>
-            <div className="calc-row">
-              <span>CGST:</span>
-              <span className="calc-val">{docMoney(cgst)}</span>
-            </div>
-            <div className="calc-row">
-              <span>SGST:</span>
-              <span className="calc-val">{docMoney(sgst)}</span>
-            </div>
-            <div className="calc-row">
-              <span>IGST:</span>
-              <span className="calc-val" style={{ color: 'var(--accent-amber)' }}>{docMoney(igst)}</span>
-            </div>
-            <div className="calc-row" style={{ fontSize: '11px' }}>
-              <span>Payable GST (excl. RCM):</span>
-              <span>{docMoney(payableTax)}</span>
-            </div>
-            <div className="calc-row grand-total">
-              <span>Grand Total amount due ({currency}):</span>
-              <span className="calc-val" style={{ color: 'var(--accent-teal)' }}>
-                {docMoney(totalAmount)}
-              </span>
-            </div>
-          </div>
-
-          {!editingInvoiceId && (
-            <InvoiceAdvanceAdjustmentSection
-              availableAdvances={customerAvailableAdvances}
-              applyAdvance={applyAdvanceOnInvoice}
-              onApplyAdvanceChange={setApplyAdvanceOnInvoice}
-              rows={invoiceAdvanceRows}
-              onRowsChange={setInvoiceAdvanceRows}
-              invoiceAmount={totalAmount}
-              currency={currency}
-            />
-          )}
-
-          <div className="btn-row">
-            <button type="button" className="btn-secondary" onClick={resetInvoiceForm}>
-              Cancel Setup
-            </button>
-            <button
-              type="button"
-              className={`btn-primary${invoiceSaving ? ' btn-submitting' : ''}`}
-              data-no-btn-spinner
-              disabled={invoiceSaving}
-              onClick={handleSaveInvoice}
-            >
-              {editingInvoiceId ? 'Update Sales Invoice' : 'Generate Sales Invoice'}
-            </button>
+                </div>
+                <div className="calc-row">
+                  <span>CGST</span>
+                  <span className="calc-val">{docMoney(cgst)}</span>
+                </div>
+                <div className="calc-row">
+                  <span>SGST</span>
+                  <span className="calc-val">{docMoney(sgst)}</span>
+                </div>
+                <div className="calc-row">
+                  <span>IGST</span>
+                  <span className="calc-val" style={{ color: 'var(--accent-amber)' }}>{docMoney(igst)}</span>
+                </div>
+                <div className="calc-row calc-row--muted">
+                  <span>Payable GST</span>
+                  <span>{docMoney(payableTax)}</span>
+                </div>
+              </div>
+              {!editingInvoiceId && (
+                <InvoiceAdvanceAdjustmentSection
+                  availableAdvances={customerAvailableAdvances}
+                  applyAdvance={applyAdvanceOnInvoice}
+                  onApplyAdvanceChange={setApplyAdvanceOnInvoice}
+                  rows={invoiceAdvanceRows}
+                  onRowsChange={setInvoiceAdvanceRows}
+                  invoiceAmount={totalAmount}
+                  currency={currency}
+                />
+              )}
+              <div className="billing-sheet__actions">
+                <button type="button" className="btn-secondary" onClick={resetInvoiceForm}>Cancel</button>
+                <button
+                  type="button"
+                  className={`btn-primary billing-sheet__generate${invoiceSaving ? ' btn-submitting' : ''}`}
+                  data-no-btn-spinner
+                  disabled={invoiceSaving}
+                  onClick={handleSaveInvoice}
+                >
+                  {editingInvoiceId ? 'Update' : 'Generate'}
+                </button>
+              </div>
+            </aside>
           </div>
         </form>
       ) : (
@@ -10654,6 +10623,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
       onChangeIds={onChangeIds}
       onChangeRole={onChangeRole}
       showRoles={showRoles}
+      label="2. Company Access Matrix"
       idPrefix={inputId}
     />
   );
@@ -10796,14 +10766,21 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
       </div>
 
       {settingsSubTab === 'companies' && canManageCompanies && (
-        <div className="master-form">
-          <h3 className="form-section-title">Create New Company</h3>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>
-            {isGroupAdmin
-              ? 'Create additional companies under your group admin account. Each company has isolated data.'
-              : 'As portal super admin, you can register unlimited companies. Each company has isolated data.'}
-          </p>
-          <div className="form-grid-2">
+        <div className="master-form user-mgmt-sheet">
+          <div className="user-mgmt-sheet__toolbar">
+            <div>
+              <p className="user-mgmt-sheet__eyebrow">Manage Companies</p>
+              <h3 className="form-section-title user-mgmt-sheet__title">Create New Company Sheet</h3>
+              <p className="user-mgmt-sheet__subtitle">
+                {isGroupAdmin
+                  ? 'Add a company under your group, then grant access to existing users in one step.'
+                  : 'Register a company and optionally grant Aditya (or any user) access immediately.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="form-section-title">1. Company Identity</div>
+          <div className="form-grid-2 user-mgmt-panel">
             <div className="form-group">
               <label>Company Legal Name*</label>
               <input className="form-input" value={newCompanyName} onChange={(e) => setNewCompanyName(e.target.value)} />
@@ -10817,46 +10794,53 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
               <input className="form-input" value={newCompanyState} onChange={(e) => setNewCompanyState(e.target.value)} />
             </div>
           </div>
-          <UserAccessPicker
-            users={assignableUsersForNewCompany}
-            selectedIds={newCompanyUserIds}
-            rolesByUser={newCompanyUserRoles}
-            onChangeIds={setNewCompanyUserIds}
-            onChangeRole={(userId, role) => setNewCompanyUserRoles((prev) => ({ ...prev, [String(userId)]: role }))}
-            idPrefix="new-company-users"
-          />
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={companyCreating || !newCompanyName.trim()}
-            onClick={async () => {
-              setCompanyCreating(true);
-              try {
-                const userRoles = {};
-                newCompanyUserIds.forEach((id) => {
-                  userRoles[String(id)] = newCompanyUserRoles[String(id)] || 'user';
-                });
-                await createCompany({
-                  name: newCompanyName.trim(),
-                  gstin: newCompanyGstin.trim() || null,
-                  state: newCompanyState.trim() || 'Gujarat',
-                  user_ids: newCompanyUserIds.map((id) => parseInt(id, 10)).filter(Boolean),
-                  user_roles: userRoles,
-                });
-                setNewCompanyName('');
-                setNewCompanyGstin('');
-                setNewCompanyUserIds([]);
-                setNewCompanyUserRoles({});
-                alert('Company created successfully.');
-              } catch (err) {
-                showApiError('Creating company', err);
-              } finally {
-                setCompanyCreating(false);
-              }
-            }}
-          >
-            {companyCreating ? 'Creating...' : 'Create Company'}
-          </button>
+
+          <div className="user-mgmt-panel">
+            <UserAccessPicker
+              users={assignableUsersForNewCompany}
+              selectedIds={newCompanyUserIds}
+              rolesByUser={newCompanyUserRoles}
+              onChangeIds={setNewCompanyUserIds}
+              onChangeRole={(userId, role) => setNewCompanyUserRoles((prev) => ({ ...prev, [String(userId)]: role }))}
+              label="2. Grant Access to Existing Users"
+              idPrefix="new-company-users"
+            />
+          </div>
+
+          <div className="btn-row">
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={companyCreating || !newCompanyName.trim()}
+              onClick={async () => {
+                setCompanyCreating(true);
+                try {
+                  const userRoles = {};
+                  newCompanyUserIds.forEach((id) => {
+                    userRoles[String(id)] = newCompanyUserRoles[String(id)] || 'user';
+                  });
+                  await createCompany({
+                    name: newCompanyName.trim(),
+                    gstin: newCompanyGstin.trim() || null,
+                    state: newCompanyState.trim() || 'Gujarat',
+                    user_ids: newCompanyUserIds.map((id) => parseInt(id, 10)).filter(Boolean),
+                    user_roles: userRoles,
+                  });
+                  setNewCompanyName('');
+                  setNewCompanyGstin('');
+                  setNewCompanyUserIds([]);
+                  setNewCompanyUserRoles({});
+                  alert('Company created successfully.');
+                } catch (err) {
+                  showApiError('Creating company', err);
+                } finally {
+                  setCompanyCreating(false);
+                }
+              }}
+            >
+              {companyCreating ? 'Creating...' : 'Create Company'}
+            </button>
+          </div>
 
           <h3 className="form-section-title" style={{ marginTop: '32px' }}>Registered Companies</h3>
           <div className="table-card">
@@ -11173,22 +11157,45 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
       )}
 
       {settingsSubTab === 'user-mgmt' && isCompanyAdmin && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+        <div className="user-mgmt-shell">
 
           {editingUser && (
-            <form onSubmit={handleUpdateUser} className="master-form" style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '20px' }}>
-              <h3 className="form-section-title">Edit User — {editingUser.email}</h3>
-              <div className="form-grid-2">
+            <form onSubmit={handleUpdateUser} className="master-form user-mgmt-sheet">
+              <div className="user-mgmt-sheet__toolbar">
+                <div>
+                  <p className="user-mgmt-sheet__eyebrow">User Management</p>
+                  <h3 className="form-section-title user-mgmt-sheet__title">
+                    Edit User Access Sheet
+                  </h3>
+                  <p className="user-mgmt-sheet__subtitle">
+                    Update identity, password, and multi-company access for <strong>{editingUser.name}</strong> ({editingUser.email}).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setEditingUser(null);
+                    setEditAssignedCompanyIds([]);
+                    setEditCompanyRoles({});
+                  }}
+                >
+                  ← Back to Registry
+                </button>
+              </div>
+
+              <div className="form-section-title">1. Account Identity</div>
+              <div className="form-grid-2 user-mgmt-panel">
                 <div className="form-group">
-                  <label>Full Name</label>
+                  <label>Full Employee Name*</label>
                   <input className="form-input" value={editUserName} onChange={(e) => setEditUserName(e.target.value)} />
                 </div>
                 <div className="form-group">
-                  <label>Email</label>
+                  <label>Login Email ID*</label>
                   <input type="email" className="form-input" value={editUserEmail} onChange={(e) => setEditUserEmail(e.target.value)} />
                 </div>
                 <div className="form-group">
-                  <label>Role</label>
+                  <label>Primary System Role*</label>
                   <select
                     className="form-input"
                     value={editUserRole}
@@ -11202,18 +11209,29 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Reset Password (leave blank to keep current)</label>
-                  <input className="form-input" value={editUserPassword} onChange={(e) => setEditUserPassword(e.target.value)} />
+                  <label>Reset Password (optional)</label>
+                  <input
+                    className="form-input"
+                    placeholder="Leave blank to keep current password"
+                    value={editUserPassword}
+                    onChange={(e) => setEditUserPassword(e.target.value)}
+                  />
                 </div>
               </div>
-              {canAssignCompanies && renderCompanyAccessPicker(
-                editAssignedCompanyIds,
-                setEditAssignedCompanyIds,
-                editCompanyRoles,
-                (companyId, role) => setEditCompanyRoles((prev) => ({ ...prev, [String(companyId)]: role })),
-                'edit-user-companies',
-                editUserRole !== 'group_admin'
+
+              {canAssignCompanies && (
+                <div className="user-mgmt-panel">
+                  {renderCompanyAccessPicker(
+                    editAssignedCompanyIds,
+                    setEditAssignedCompanyIds,
+                    editCompanyRoles,
+                    (companyId, role) => setEditCompanyRoles((prev) => ({ ...prev, [String(companyId)]: role })),
+                    'edit-user-companies',
+                    editUserRole !== 'group_admin'
+                  )}
+                </div>
               )}
+
               <div className="btn-row">
                 <button
                   type="button"
@@ -11226,22 +11244,35 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary">Save Changes</button>
+                <button type="submit" className="btn-primary">Save User Access</button>
               </div>
             </form>
           )}
           
           {/* USER REGISTRATION FORM */}
-          <form onSubmit={handleCreateUser} className="master-form">
-            <h3 className="form-section-title">Register New Company Employee User</h3>
-            <div className="form-grid-3">
+          {!editingUser && (
+          <form onSubmit={handleCreateUser} className="master-form user-mgmt-sheet">
+            <div className="user-mgmt-sheet__toolbar">
+              <div>
+                <p className="user-mgmt-sheet__eyebrow">User Management</p>
+                <h3 className="form-section-title user-mgmt-sheet__title">
+                  Register New Company Employee
+                </h3>
+                <p className="user-mgmt-sheet__subtitle">
+                  Create login credentials and grant access across one or more companies — same clarity as your sales billing sheet.
+                </p>
+              </div>
+            </div>
+
+            <div className="form-section-title">1. Employee Identity & Role</div>
+            <div className="form-grid-3 user-mgmt-panel">
               <div className="form-group">
                 <label>User Email ID (Login ID)*</label>
                 <input type="email" className="form-input" placeholder="name@company.com" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
               </div>
               <div className="form-group">
                 <label>Full Employee Name*</label>
-                <input type="text" className="form-input" placeholder="e.g. Jasprit Bumrah" value={newName} onChange={(e) => setNewName(e.target.value)} />
+                <input type="text" className="form-input" placeholder="e.g. Aditya Bhai" value={newName} onChange={(e) => setNewName(e.target.value)} />
               </div>
               <div className="form-group">
                 <label>System Role Rights*</label>
@@ -11258,39 +11289,53 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                 </select>
               </div>
             </div>
-            {canAssignCompanies && renderCompanyAccessPicker(
-              newAssignedCompanyIds,
-              setNewAssignedCompanyIds,
-              newCompanyRoles,
-              (companyId, role) => setNewCompanyRoles((prev) => ({ ...prev, [String(companyId)]: role })),
-              'new-user-companies',
-              newRole !== 'group_admin'
+
+            {canAssignCompanies && (
+              <div className="user-mgmt-panel">
+                {renderCompanyAccessPicker(
+                  newAssignedCompanyIds,
+                  setNewAssignedCompanyIds,
+                  newCompanyRoles,
+                  (companyId, role) => setNewCompanyRoles((prev) => ({ ...prev, [String(companyId)]: role })),
+                  'new-user-companies',
+                  newRole !== 'group_admin'
+                )}
+              </div>
             )}
             {!canAssignCompanies && activeCompany?.name && (
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', marginBottom: '16px' }}>
                 New users will be registered under <strong>{activeCompany.name}</strong>.
               </p>
             )}
-            <div className="form-grid-2">
+
+            <div className="form-section-title">3. Security Credentials</div>
+            <div className="form-grid-2 user-mgmt-panel">
               <div className="form-group">
-                <label>Define Password (User cannot change for security audits)*</label>
+                <label>Define Password*</label>
                 <input type="text" className="form-input" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 6 }}>
+                  User cannot self-change password (security audit trail).
+                </p>
               </div>
-              <div className="form-group" style={{ justifyContent: 'flex-end', display: 'flex' }}>
-                <button type="submit" className="btn-primary" style={{ marginTop: '20px', width: '220px' }}>
+              <div className="form-group" style={{ justifyContent: 'flex-end', display: 'flex', alignItems: 'flex-end' }}>
+                <button type="submit" className="btn-primary" style={{ minWidth: '220px' }}>
                   Register User Credentials
                 </button>
               </div>
             </div>
           </form>
+          )}
 
           {/* USER LIST REGISTRY */}
-          <div className="table-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-              <h3 className="chart-title" style={{ margin: 0 }}>Registered User Registry Database</h3>
+          <div className="table-card user-registry-card">
+            <div className="user-registry-card__head">
+              <div>
+                <p className="user-mgmt-sheet__eyebrow">Registry</p>
+                <h3 className="chart-title">Registered User Database</h3>
+              </div>
               {isSuperAdmin && (
-                <div className="form-group" style={{ margin: 0, minWidth: '220px' }}>
-                  <label style={{ fontSize: '11px' }}>Filter by Company</label>
+                <div className="form-group user-registry-card__filter">
+                  <label>Filter by Company</label>
                   <select className="form-input" value={userCompanyFilter} onChange={(e) => setUserCompanyFilter(e.target.value)}>
                     <option value="">All companies</option>
                     {(companies || []).map((co) => (
@@ -11305,7 +11350,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                 <thead>
                   <tr>
                     <th>User ID</th>
-                    {isSuperAdmin && <th>Company</th>}
+                    {isSuperAdmin && <th>Company Access</th>}
                     <th>Email Address</th>
                     <th>Full Employee Name</th>
                     <th>Access Role</th>
@@ -11357,7 +11402,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                               setEditCompanyRoles(roles);
                             }}
                           >
-                            Edit
+                            Edit Access
                           </button>
                           {currentUser.id !== u.id ? (
                             <button
