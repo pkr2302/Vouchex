@@ -641,7 +641,10 @@ class PortalMutationController extends Controller
         $paid = Payment::where('expense_id', $expenseId)
             ->selectRaw('COALESCE(SUM(amount_paid + tds_deducted), 0) as total')
             ->value('total');
-        $expense->payment_status = $paid >= $expense->total_amount ? 'Paid' : 'Partially Paid';
+        $paidAmt = (float) $paid;
+        $expense->payment_status = $paidAmt >= (float) $expense->total_amount
+            ? 'Paid'
+            : ($paidAmt > 0.009 ? 'Partially Paid' : 'Unpaid');
         $expense->save();
     }
 

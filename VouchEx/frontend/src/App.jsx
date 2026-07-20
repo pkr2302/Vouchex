@@ -78,6 +78,7 @@ import {
   PaymentTermsSelect,
   AmountInput,
   TdsPercentAmountFields,
+  SettlementModeToggle,
   SettlementBreakdown,
   Modal,
 } from './components/portalShared';
@@ -4716,6 +4717,7 @@ function ReceiptTab() {
   // Standard Form states
   const [amountReceived, setAmountReceived] = useState('');
   const [amountReceivable, setAmountReceivable] = useState('');
+  const [receiptSettleMode, setReceiptSettleMode] = useState('full'); // full | partial
   const [tdsDeducted, setTdsDeducted] = useState('');
   const [discountAllowed, setDiscountAllowed] = useState('');
   const [paymentDate, setPaymentDate] = useState(portalTodayDateOnly());
@@ -4928,6 +4930,12 @@ function ReceiptTab() {
     setTdsDeducted(rec.tds_deducted ?? '');
     setDiscountAllowed(rec.discount_allowed ?? '');
     setAmountReceived(rec.amount_received);
+    // Detect partial vs full against current outstanding (+ this receipt's settlement).
+    const inv = invoices.find((i) => sameId(i.id, rec.invoice_id));
+    let outstanding = inv ? invoiceOutstandingAmount(inv, receipts, creditNotes, advanceAdjustments) : 0;
+    outstanding += receiptSettlementTotal(rec);
+    const settled = receiptSettlementTotal(rec);
+    setReceiptSettleMode(settled + 0.009 < outstanding ? 'partial' : 'full');
   };
 
   const resetReceiptForm = () => {
@@ -4940,6 +4948,22 @@ function ReceiptTab() {
     setAmountReceived('');
     setTdsDeducted('');
     setDiscountAllowed('');
+    setReceiptSettleMode('full');
+  };
+
+  const applyReceiptSettleMode = (mode) => {
+    setReceiptSettleMode(mode);
+    if (!invoiceId) return;
+    const pending = getPendingAmount();
+    if (mode === 'full') {
+      setAmountReceivable(pending > 0 ? pending : '');
+      setTdsDeducted('');
+      setDiscountAllowed('');
+    } else if (Math.abs(toAmount(amountReceivable) - pending) < 0.02) {
+      // Clear full autofill so user enters the partial amount intentionally.
+      setAmountReceivable('');
+      setAmountReceived('');
+    }
   };
 
   const linkedReceiptInvoice = invoiceId
@@ -4974,8 +4998,9 @@ function ReceiptTab() {
 
   useEffect(() => {
     if (receiptFormMode !== 'standard' || !invoiceId || editingReceiptId) return;
+    if (receiptSettleMode !== 'full') return;
     setAmountReceivable(getPendingAmount());
-  }, [invoiceId, receiptFormMode, editingReceiptId]);
+  }, [invoiceId, receiptFormMode, editingReceiptId, receiptSettleMode]);
 
   useEffect(() => {
     if (skipReceiptInvoiceAutofillRef.current) {
@@ -4991,6 +5016,7 @@ function ReceiptTab() {
     if (invoiceId && !editingReceiptId) {
       const inv = invoices.find((i) => sameId(i.id, invoiceId));
       const pending = getPendingAmount();
+      setReceiptSettleMode('full');
       setAmountReceivable(pending);
       setTdsDeducted('');
       setDiscountAllowed('');
@@ -5001,6 +5027,7 @@ function ReceiptTab() {
       setAmountReceived('');
       setTdsDeducted('');
       setDiscountAllowed('');
+      setReceiptSettleMode('full');
     }
   }, [invoiceId, receiptFormMode, editingReceiptId]);
 
@@ -5584,17 +5611,63 @@ function ReceiptTab() {
                 </div>
                 <CurrencySelect label="Receipt currency" value={receiptCurrency} onChange={setReceiptCurrency} required />
                 <div className="form-group">
-                  <label>Amount Receivable ({receiptCurSym})*</label>
+                  <label>Settlement type*</label>
+                  <SettlementModeToggle
+                    value={receiptSettleMode}
+                    onChange={applyReceiptSettleMode}
+                    fullLabel="Full receipt"
+                    partialLabel="Partial receipt"
+                    ariaLabel="Receipt settlement type"
+                  />
+                  <p className="form-hint">
+                    {receiptSettleMode === 'partial'
+                      ? 'Enter only the portion being collected now. Remaining balance stays on the invoice.'
+                      : 'Clears the full outstanding balance on this invoice (after TDS / discount).'}
+                  </p>
+                </div>
+                <div className="form-group">
+                  <label>
+                    {receiptSettleMode === 'partial'
+                      ? `Partial amount to settle (${receiptCurSym})*`
+                      : `Amount Receivable (${receiptCurSym})*`}
+                  </label>
                   <AmountInput
                     noSpinner
                     className="form-input"
                     value={amountReceivable}
-                    onChange={setAmountReceivable}
-                    placeholder="Outstanding / partial settlement"
+                    onChange={(v) => {
+                      setAmountReceivable(v);
+                      const pending = getPendingAmount();
+                      if (pending > 0 && toAmount(v) + 0.009 < pending) {
+                        setReceiptSettleMode('partial');
+                      } else if (pending > 0 && Math.abs(toAmount(v) - pending) < 0.02) {
+                        setReceiptSettleMode('full');
+                      }
+                    }}
+                    placeholder={
+                      receiptSettleMode === 'partial'
+                        ? 'Enter partial settlement amount'
+                        : 'Outstanding / partial settlement'
+                    }
+                    readOnly={receiptSettleMode === 'full' && !!invoiceId}
+                    style={
+                      receiptSettleMode === 'full' && invoiceId
+                        ? { backgroundColor: 'var(--bg-primary)', cursor: 'not-allowed' }
+                        : undefined
+                    }
                   />
                   {invoiceId && (
                     <p className="form-hint" style={{ marginTop: 4 }}>
                       Outstanding on bill: {formatDocumentMoney(getPendingAmount(), receiptCurrency)}
+                      {receiptSettleMode === 'partial' && toAmount(amountReceivable) > 0 && (
+                        <>
+                          {' · '}Remaining after this:{' '}
+                          {formatDocumentMoney(
+                            Math.max(0, getPendingAmount() - toAmount(amountReceivable)),
+                            receiptCurrency
+                          )}
+                        </>
+                      )}
                     </p>
                   )}
                 </div>
@@ -7608,6 +7681,7 @@ function PaymentTab() {
   const [payee, setPayee] = useState('');
   const [amountPayable, setAmountPayable] = useState('');
   const [amountPaid, setAmountPaid] = useState('');
+  const [paymentSettleMode, setPaymentSettleMode] = useState('full'); // full | partial
   const [paymentDate, setPaymentDate] = useState('2026-05-23');
   const [paidFrom, setPaidFrom] = useState('');
   const [paymentMode, setPaymentMode] = useState('Bank Transfer');
@@ -7705,6 +7779,26 @@ function PaymentTab() {
     setAmountPayable(paymentSettlementTotal(pay));
     setTdsDeducted(pay.tds_deducted ?? '');
     setAmountPaid(pay.amount_paid);
+    const exp = expenses.find((e) => sameId(e.id, pay.expense_id));
+    let outstanding = exp ? getOutstandingForExpense(exp, pay.id) : 0;
+    outstanding += paymentSettlementTotal(pay);
+    const settled = paymentSettlementTotal(pay);
+    setPaymentSettleMode(settled + 0.009 < outstanding ? 'partial' : 'full');
+  };
+
+  const applyPaymentSettleMode = (mode) => {
+    setPaymentSettleMode(mode);
+    if (!expenseId) return;
+    const exp = expenses.find((e) => sameId(e.id, expenseId));
+    if (!exp) return;
+    const outstanding = getOutstandingForExpense(exp, editingPaymentId);
+    if (mode === 'full') {
+      setAmountPayable(outstanding > 0 ? outstanding : '');
+      setTdsDeducted('');
+    } else if (Math.abs(toAmount(amountPayable) - outstanding) < 0.02) {
+      setAmountPayable('');
+      setAmountPaid('');
+    }
   };
 
   // List of unique vendors with outstanding balances
@@ -7734,11 +7828,12 @@ function PaymentTab() {
 
   useEffect(() => {
     if (!expenseId || editingPaymentId) return;
+    if (paymentSettleMode !== 'full') return;
     const exp = expenses.find((e) => e.id === parseInt(expenseId, 10));
     if (exp) {
       setAmountPayable(getOutstandingForExpense(exp, editingPaymentId));
     }
-  }, [expenseId, editingPaymentId]);
+  }, [expenseId, editingPaymentId, paymentSettleMode]);
 
   useEffect(() => {
     if (skipPaymentExpenseAutofillRef.current) {
@@ -7754,6 +7849,7 @@ function PaymentTab() {
       const exp = expenses.find((e) => e.id === parseInt(expenseId, 10));
       if (exp) {
         const outstanding = getOutstandingForExpense(exp, editingPaymentId);
+        setPaymentSettleMode('full');
         setAmountPayable(outstanding);
         setTdsDeducted('');
         setAmountPaid(outstanding);
@@ -7763,6 +7859,7 @@ function PaymentTab() {
       setAmountPayable('');
       setAmountPaid('');
       setTdsDeducted('');
+      setPaymentSettleMode('full');
     }
   }, [expenseId, editingPaymentId]);
 
@@ -7792,6 +7889,7 @@ function PaymentTab() {
     setAmountPaid('');
     setTdsDeducted('');
     setReferenceNo('');
+    setPaymentSettleMode('full');
   };
 
   usePortalFormIntent('payment', () => {
@@ -8166,11 +8264,72 @@ function PaymentTab() {
                 </div>
                 <CurrencySelect label="Payment currency" value={paymentCurrency} onChange={setPaymentCurrency} required />
                 <div className="form-group">
-                  <Req>Amount Payable ({paymentCurSym})</Req>
-                  <AmountInput noSpinner value={amountPayable} onChange={setAmountPayable} />
+                  <label>Settlement type*</label>
+                  <SettlementModeToggle
+                    value={paymentSettleMode}
+                    onChange={applyPaymentSettleMode}
+                    fullLabel="Full payment"
+                    partialLabel="Partial payment"
+                    ariaLabel="Payment settlement type"
+                  />
+                  <p className="form-hint">
+                    {paymentSettleMode === 'partial'
+                      ? 'Enter only the portion being paid now. Remaining balance stays on the bill.'
+                      : 'Clears the full outstanding liability on this bill (after TDS).'}
+                  </p>
+                </div>
+                <div className="form-group">
+                  <Req>
+                    {paymentSettleMode === 'partial'
+                      ? `Partial amount to settle (${paymentCurSym})`
+                      : `Amount Payable (${paymentCurSym})`}
+                  </Req>
+                  <AmountInput
+                    noSpinner
+                    value={amountPayable}
+                    onChange={(v) => {
+                      setAmountPayable(v);
+                      const outstanding = linkedPaymentExpense
+                        ? getOutstandingForExpense(linkedPaymentExpense, editingPaymentId)
+                        : 0;
+                      if (outstanding > 0 && toAmount(v) + 0.009 < outstanding) {
+                        setPaymentSettleMode('partial');
+                      } else if (outstanding > 0 && Math.abs(toAmount(v) - outstanding) < 0.02) {
+                        setPaymentSettleMode('full');
+                      }
+                    }}
+                    placeholder={
+                      paymentSettleMode === 'partial'
+                        ? 'Enter partial settlement amount'
+                        : undefined
+                    }
+                    readOnly={paymentSettleMode === 'full' && !!expenseId}
+                    style={
+                      paymentSettleMode === 'full' && expenseId
+                        ? { backgroundColor: 'var(--bg-primary)', cursor: 'not-allowed' }
+                        : undefined
+                    }
+                  />
                   {expenseId && (
                     <p className="form-hint" style={{ marginTop: 4 }}>
-                      Outstanding on bill: {formatDocumentMoney(getOutstandingForExpense(linkedPaymentExpense), paymentCurrency)}
+                      Outstanding on bill:{' '}
+                      {formatDocumentMoney(
+                        getOutstandingForExpense(linkedPaymentExpense, editingPaymentId),
+                        paymentCurrency
+                      )}
+                      {paymentSettleMode === 'partial' && toAmount(amountPayable) > 0 && (
+                        <>
+                          {' · '}Remaining after this:{' '}
+                          {formatDocumentMoney(
+                            Math.max(
+                              0,
+                              getOutstandingForExpense(linkedPaymentExpense, editingPaymentId) -
+                                toAmount(amountPayable)
+                            ),
+                            paymentCurrency
+                          )}
+                        </>
+                      )}
                     </p>
                   )}
                 </div>

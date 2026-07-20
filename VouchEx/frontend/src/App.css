@@ -8036,6 +8036,42 @@ input:hover:not(:disabled):not(:focus), select:hover:not(:disabled):not(:focus),
   color: var(--text-muted);
   margin: 4px 0 0;
 }
+
+.settlement-mode {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  margin-bottom: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary, rgba(0, 0, 0, 0.03));
+}
+
+.settlement-mode__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 7px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.settlement-mode__btn.is-active {
+  background: var(--accent-blue, #2563eb);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+.settlement-mode__btn:focus-visible {
+  outline: 2px solid var(--accent-blue, #2563eb);
+  outline-offset: 1px;
+}
+
 .gst-badge {
   font-size: 10px;
   font-weight: 700;

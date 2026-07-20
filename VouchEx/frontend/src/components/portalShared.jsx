@@ -998,6 +998,38 @@ export function TdsPercentAmountFields({
   );
 }
 
+/** Full vs partial settlement against an outstanding bill. */
+export function SettlementModeToggle({
+  value = 'full',
+  onChange,
+  fullLabel = 'Full settlement',
+  partialLabel = 'Partial',
+  ariaLabel = 'Settlement type',
+}) {
+  return (
+    <div className="settlement-mode" role="radiogroup" aria-label={ariaLabel}>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={value === 'full'}
+        className={`settlement-mode__btn${value === 'full' ? ' is-active' : ''}`}
+        onClick={() => onChange?.('full')}
+      >
+        {fullLabel}
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={value === 'partial'}
+        className={`settlement-mode__btn${value === 'partial' ? ' is-active' : ''}`}
+        onClick={() => onChange?.('partial')}
+      >
+        {partialLabel}
+      </button>
+    </div>
+  );
+}
+
 /** Cash + TDS + discount = amount settled against bill (receipt or payment). */
 export function SettlementBreakdown({
   currency = 'INR',
