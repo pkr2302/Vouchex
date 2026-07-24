@@ -8072,6 +8072,45 @@ input:hover:not(:disabled):not(:focus), select:hover:not(:disabled):not(:focus),
   outline-offset: 1px;
 }
 
+.excel-import-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.excel-import-banner--error {
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--accent-red, #dc2626);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+}
+
+.excel-import-banner--ok {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--accent-teal, #0f766e);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.excel-import-errors {
+  max-height: 160px;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-tertiary, rgba(0, 0, 0, 0.03));
+  border: 1px solid var(--border-color);
+}
+
+.excel-import-errors ul {
+  margin: 6px 0 0;
+  padding-left: 16px;
+}
+
 .gst-badge {
   font-size: 10px;
   font-weight: 700;

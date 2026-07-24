@@ -83,6 +83,7 @@ import {
   Modal,
 } from './components/portalShared';
 import { TaxExportModal } from './components/TaxExportModal';
+import ExcelImportModal from './components/ExcelImportModal';
 import { exportGstr1OfflineJson } from './utils/taxExport/gstr1JsonExport';
 import { scopeTaxDataForPeriod } from './utils/taxPeriodData';
 import { filterRecordsByDateRange } from './utils/taxExport/exportPeriod';
@@ -1125,6 +1126,7 @@ function SalesInvoicesSubTab() {
   const [selectedInvoiceForPDF, setSelectedInvoiceForPDF] = useState(null);
   const [einvoiceModalInvoice, setEinvoiceModalInvoice] = useState(null);
   const [ewayModalInvoice, setEwayModalInvoice] = useState(null);
+  const [showExcelImport, setShowExcelImport] = useState(false);
 
   const ewayForInvoice = (invoiceId) =>
     (ewayBills || []).find((b) => Number(b.invoice_id) === Number(invoiceId) && b.status === 'active');
@@ -1731,6 +1733,13 @@ function SalesInvoicesSubTab() {
             </button>
             <button
               className="btn-primary"
+              style={{ background: 'linear-gradient(135deg, var(--accent-amber, #d97706), #b45309)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => setShowExcelImport(true)}
+            >
+              <Upload size={14} /> Import Excel
+            </button>
+            <button
+              className="btn-primary"
               style={{ background: 'linear-gradient(135deg, var(--accent-blue), #1d4ed8)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               onClick={() => handleDownloadInvoices('csv')}
             >
@@ -1746,6 +1755,21 @@ function SalesInvoicesSubTab() {
           </div>
         </div>
       )}
+
+      <ExcelImportModal
+        open={showExcelImport}
+        onClose={() => setShowExcelImport(false)}
+        type="sales"
+        context={{ customers, invoices, companyState: registeredState }}
+        createFn={async (job) => {
+          await createInvoice(job.invoice, job.items);
+        }}
+        onComplete={(summary) => {
+          if (summary.ok > 0) {
+            addConsoleLog('event', 'POST /api/invoices/import', `Imported ${summary.ok} sales invoice(s) from Excel.`);
+          }
+        }}
+      />
 
       <InlineCustomerModal
         open={showInlineCustomer}
@@ -4770,6 +4794,7 @@ function ReceiptTab() {
   // PDF Voucher Preview
   const [selectedReceiptForPDF, setSelectedReceiptForPDF] = useState(null);
   const [editingReceiptId, setEditingReceiptId] = useState(null);
+  const [showExcelImport, setShowExcelImport] = useState(false);
   const skipReceiptInvoiceAutofillRef = useRef(false);
   const receiptAutofillInvoiceRef = useRef(null);
 
@@ -5809,6 +5834,14 @@ function ReceiptTab() {
               <button
                 type="button"
                 className="btn-primary receipt-registry-toolbar__export"
+                style={{ background: 'linear-gradient(135deg, var(--accent-amber, #d97706), #b45309)' }}
+                onClick={() => setShowExcelImport(true)}
+              >
+                <Upload size={14} /> Import Excel
+              </button>
+              <button
+                type="button"
+                className="btn-primary receipt-registry-toolbar__export"
                 onClick={() => handleDownloadReceipts('csv')}
               >
                 <Download size={14} /> Export CSV
@@ -5822,6 +5855,21 @@ function ReceiptTab() {
               </button>
             </div>
           </div>
+
+          <ExcelImportModal
+            open={showExcelImport}
+            onClose={() => setShowExcelImport(false)}
+            type="receipts"
+            context={{ customers, invoices, bankAccounts, cashLedgers }}
+            createFn={async (job) => {
+              await createReceipt(job.payload);
+            }}
+            onComplete={(summary) => {
+              if (summary.ok > 0) {
+                addConsoleLog('event', 'POST /api/receipts/import', `Imported ${summary.ok} receipt(s) from Excel.`);
+              }
+            }}
+          />
 
           <div>
               {/* PENDING INVOICES CHECKLIST VIEW */}
@@ -6144,6 +6192,7 @@ function ExpenseTab({ recordTypeFilter = 'expense', vendorMasterOnly = false, pu
   const [expenseLineItems, setExpenseLineItems] = useState([emptyLineItem()]);
   const [uploadedBillFile, setUploadedBillFile] = useState(null);
   const billFileRef = useRef(null);
+  const [showExcelImport, setShowExcelImport] = useState(false);
 
   const [selectedLedgerVendor, setSelectedLedgerVendor] = useState(null);
   const [selectedLedgerVendorPDF, setSelectedLedgerVendorPDF] = useState(null);
@@ -7286,6 +7335,13 @@ function ExpenseTab({ recordTypeFilter = 'expense', vendorMasterOnly = false, pu
                   <button className="btn-primary" onClick={() => { setEditingExpenseId(null); setShowAddForm(true); }}>
                     {purchaseMode ? 'Record Purchase Invoice' : 'Record Expense'}
                   </button>
+                  <button
+                    className="btn-primary"
+                    style={{ background: 'linear-gradient(135deg, var(--accent-amber, #d97706), #b45309)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    onClick={() => setShowExcelImport(true)}
+                  >
+                    <Upload size={14} /> Import Excel
+                  </button>
                   <button className="btn-primary" style={{ background: 'linear-gradient(135deg, var(--accent-blue), #1d4ed8)', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={() => handleDownloadExpenses('csv')}>
                     <Download size={14} /> Export CSV
                   </button>
@@ -7294,6 +7350,30 @@ function ExpenseTab({ recordTypeFilter = 'expense', vendorMasterOnly = false, pu
                   </button>
                 </div>
               </div>
+
+              <ExcelImportModal
+                open={showExcelImport}
+                onClose={() => setShowExcelImport(false)}
+                type="purchase"
+                context={{
+                  vendors,
+                  expenses,
+                  companyState: registeredState,
+                  recordType: recordTypeFilter === 'purchase' ? 'purchase' : 'expense',
+                }}
+                createFn={async (job) => {
+                  await createExpense(job.payload);
+                }}
+                onComplete={(summary) => {
+                  if (summary.ok > 0) {
+                    addConsoleLog(
+                      'event',
+                      'POST /api/expenses/import',
+                      `Imported ${summary.ok} ${purchaseMode ? 'purchase' : 'expense'} bill(s) from Excel.`
+                    );
+                  }
+                }}
+              />
 
               <MobileFilterShell
                 activeCount={countActiveFilters([filterStartDate, filterEndDate, registrySearch])}
@@ -7669,6 +7749,7 @@ function PaymentTab() {
   const [selectedPaymentForPDF, setSelectedPaymentForPDF] = useState(null);
   const [showRecordPayment, setShowRecordPayment] = useState(false);
   const [editingPaymentId, setEditingPaymentId] = useState(null);
+  const [showExcelImport, setShowExcelImport] = useState(false);
   const skipPaymentExpenseAutofillRef = useRef(false);
   const paymentAutofillExpenseRef = useRef(null);
   const [expenseId, setExpenseId] = useState('');
@@ -8222,6 +8303,14 @@ function PaymentTab() {
                 <button type="button" className="btn-primary" onClick={() => setShowRecordPayment(true)}>
                   Record Payment
                 </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ background: 'linear-gradient(135deg, var(--accent-amber, #d97706), #b45309)', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', padding: '6px 12px' }}
+                  onClick={() => setShowExcelImport(true)}
+                >
+                  <Upload size={12} /> Import Excel
+                </button>
                 <button className="btn-primary" style={{ background: 'linear-gradient(135deg, var(--accent-blue), #1d4ed8)', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', padding: '6px 12px' }} onClick={() => handleDownloadPayments('csv')}>
                   <Download size={12} /> Export CSV
                 </button>
@@ -8231,6 +8320,21 @@ function PaymentTab() {
               </div>
             </div>
           )}
+
+          <ExcelImportModal
+            open={showExcelImport}
+            onClose={() => setShowExcelImport(false)}
+            type="payments"
+            context={{ expenses, bankAccounts, cashLedgers }}
+            createFn={async (job) => {
+              await createPayment(job.payload);
+            }}
+            onComplete={(summary) => {
+              if (summary.ok > 0) {
+                addConsoleLog('event', 'POST /api/payments/import', `Imported ${summary.ok} payment(s) from Excel.`);
+              }
+            }}
+          />
 
           {showRecordPayment && (
             <form onSubmit={handleSaveSinglePayment} className="master-form" style={{ marginBottom: '24px' }}>
