@@ -41,6 +41,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -1168,6 +1169,11 @@ class PortalMutationController extends Controller
         }
 
         unset($data['inactivity_timeout']);
+
+        // Live DB may not have run the upi_id migration yet — avoid 1054 Unknown column.
+        if (array_key_exists('upi_id', $data) && ! Schema::hasColumn('company_settings', 'upi_id')) {
+            unset($data['upi_id']);
+        }
 
         $company = PortalDataService::companyRecord();
         $company->fill($data);

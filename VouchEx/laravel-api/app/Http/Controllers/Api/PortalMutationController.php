@@ -1159,6 +1159,11 @@ class PortalMutationController extends Controller
 
         unset($data['inactivity_timeout']);
 
+        // Live DB may not have run the upi_id migration yet — avoid 1054 Unknown column.
+        if (array_key_exists('upi_id', $data) && ! Schema::hasColumn('company_settings', 'upi_id')) {
+            unset($data['upi_id']);
+        }
+
         $company = PortalDataService::companyRecord();
         $company->fill($data);
         $company->save();
