@@ -4,6 +4,7 @@ import { formatDocumentMoney } from '../utils/formatMoney';
 import { showApiError } from '../utils/apiErrors';
 import FinancialPeriodBar, { getDefaultAppliedPeriod } from './FinancialPeriodBar';
 import LedgerStatementModal from './LedgerStatementModal';
+import SettlementComparisonReport from './SettlementComparisonReport';
 import { buildTrialBalanceHeading } from '../utils/financialPeriod';
 import { useSimulator } from '../context/SimulatorContext';
 
@@ -63,6 +64,7 @@ export default function RegistersTab({ view = 'ledger' }) {
   const [draftPeriod, setDraftPeriod] = useState(() => getDefaultAppliedPeriod());
   const [periodError, setPeriodError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registerMode, setRegisterMode] = useState('gst'); // gst | settlement
 
   const [accounts, setAccounts] = useState([]);
   const [selectedAccountId, setSelectedAccountId] = useState('');
@@ -82,6 +84,7 @@ export default function RegistersTab({ view = 'ledger' }) {
 
   const loadData = useCallback(async (period) => {
     if (!period?.from || !period?.to || view === 'ledger') return;
+    if ((view === 'sales' || view === 'purchase') && registerMode === 'settlement') return;
     setLoading(true);
     setPeriodError('');
     try {
@@ -101,7 +104,7 @@ export default function RegistersTab({ view = 'ledger' }) {
     } finally {
       setLoading(false);
     }
-  }, [view, meta.title]);
+  }, [view, meta.title, registerMode]);
 
   useEffect(() => {
     if (view === 'ledger') loadAccounts();
@@ -152,99 +155,142 @@ export default function RegistersTab({ view = 'ledger' }) {
           <h2 className="chart-title">{meta.title}</h2>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{meta.description}</p>
         </div>
-        {view !== 'ledger' && (
+        {view !== 'ledger' && registerMode === 'gst' && (
           <button type="button" className="btn-secondary" onClick={() => loadData(appliedPeriod)} disabled={loading}>
             {loading ? 'Loading…' : 'Refresh'}
           </button>
         )}
       </div>
 
-      <FinancialPeriodBar
-        draft={draftPeriod}
-        onDraftChange={setDraftPeriod}
-        onApply={handleApplyPeriod}
-        periodError={periodError}
-        loading={loading}
-      />
-
-      <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12, marginTop: 12 }}>{heading}</p>
-
-      {view === 'ledger' && (
-        <div className="table-card">
-          <div className="form-grid-2" style={{ marginBottom: 16 }}>
-            <div className="form-group">
-              <label>Ledger account</label>
-              <select className="form-input" value={selectedAccountId} onChange={(e) => setSelectedAccountId(e.target.value)}>
-                <option value="">Select account…</option>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={!selectedAccount}
-                onClick={() => setStatementAccount(selectedAccount ? {
-                  gl_account_id: selectedAccount.id,
-                  account_code: selectedAccount.code,
-                  account_name: selectedAccount.name,
-                } : null)}
-              >
-                View ledger statement
-              </button>
-            </div>
-          </div>
-          {!accounts.length && <p className="empty-state">No active GL accounts. Sync GL or add accounts in Chart of Accounts.</p>}
+      {(view === 'sales' || view === 'purchase') && (
+        <div className="settlement-mode" role="radiogroup" aria-label="Register view" style={{ marginBottom: 14 }}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={registerMode === 'gst'}
+            className={`settlement-mode__btn${registerMode === 'gst' ? ' is-active' : ''}`}
+            onClick={() => setRegisterMode('gst')}
+          >
+            GST register
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={registerMode === 'settlement'}
+            className={`settlement-mode__btn${registerMode === 'settlement' ? ' is-active' : ''}`}
+            onClick={() => setRegisterMode('settlement')}
+          >
+            {view === 'sales' ? 'Invoice ↔ Receipt + TDS' : 'Bill ↔ Payment + TDS'}
+          </button>
         </div>
       )}
 
-      {view === 'day-book' && (
+      {(view === 'sales' || view === 'purchase') && registerMode === 'settlement' ? (
+        <SettlementComparisonReport mode={view === 'sales' ? 'sales' : 'purchase'} />
+      ) : (
         <>
-          {dayBook?.totals && (
-            <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 13 }}>
-              <span>Total Debit: <strong>{formatDocumentMoney(dayBook.totals.debit, 'INR')}</strong></span>
-              <span>Total Credit: <strong>{formatDocumentMoney(dayBook.totals.credit, 'INR')}</strong></span>
-            </div>
+          {view !== 'ledger' && (
+            <FinancialPeriodBar
+              draft={draftPeriod}
+              onDraftChange={setDraftPeriod}
+              onApply={handleApplyPeriod}
+              periodError={periodError}
+              loading={loading}
+            />
           )}
-          <RegisterTable
-            columns={[
-              { key: 'date', label: 'Date' },
-              { key: 'journal_number', label: 'Journal' },
-              { key: 'account_code', label: 'Code' },
-              { key: 'account_name', label: 'Account' },
-              { key: 'particulars', label: 'Particulars' },
-              { key: 'debit', label: 'Debit', align: 'right', render: (r) => (r.debit > 0 ? formatDocumentMoney(r.debit, 'INR') : '—') },
-              { key: 'credit', label: 'Credit', align: 'right', render: (r) => (r.credit > 0 ? formatDocumentMoney(r.credit, 'INR') : '—') },
-            ]}
-            rows={dayBookRows}
-            emptyLabel="No journal lines in this period."
-          />
-        </>
-      )}
 
-      {view === 'sales' && (
-        <>
-          {salesRegister?.totals && (
-            <div style={{ marginBottom: 12, fontSize: 13 }}>
-              Total invoice value: <strong>{formatDocumentMoney(salesRegister.totals.invoice_value, 'INR')}</strong>
-              {' · '}Taxable: <strong>{formatDocumentMoney(salesRegister.totals.taxable_value, 'INR')}</strong>
-            </div>
+          {view !== 'ledger' && (
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12, marginTop: 12 }}>{heading}</p>
           )}
-          <RegisterTable columns={gstColumns} rows={salesRows} emptyLabel="No sales invoices or credit notes in this period." tableClassName="register-gst-table" />
-        </>
-      )}
 
-      {view === 'purchase' && (
-        <>
-          {purchaseRegister?.totals && (
-            <div style={{ marginBottom: 12, fontSize: 13 }}>
-              Total value: <strong>{formatDocumentMoney(purchaseRegister.totals.invoice_value, 'INR')}</strong>
-              {' · '}Taxable: <strong>{formatDocumentMoney(purchaseRegister.totals.taxable_value, 'INR')}</strong>
-            </div>
+          {view === 'ledger' && (
+            <>
+              <FinancialPeriodBar
+                draft={draftPeriod}
+                onDraftChange={setDraftPeriod}
+                onApply={handleApplyPeriod}
+                periodError={periodError}
+                loading={loading}
+              />
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12, marginTop: 12 }}>{heading}</p>
+              <div className="table-card">
+                <div className="form-grid-2" style={{ marginBottom: 16 }}>
+                  <div className="form-group">
+                    <label>Ledger account</label>
+                    <select className="form-input" value={selectedAccountId} onChange={(e) => setSelectedAccountId(e.target.value)}>
+                      <option value="">Select account…</option>
+                      {accounts.map((a) => (
+                        <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={!selectedAccount}
+                      onClick={() => setStatementAccount(selectedAccount ? {
+                        gl_account_id: selectedAccount.id,
+                        account_code: selectedAccount.code,
+                        account_name: selectedAccount.name,
+                      } : null)}
+                    >
+                      View ledger statement
+                    </button>
+                  </div>
+                </div>
+                {!accounts.length && <p className="empty-state">No active GL accounts. Sync GL or add accounts in Chart of Accounts.</p>}
+              </div>
+            </>
           )}
-          <RegisterTable columns={gstColumns} rows={purchaseRows} emptyLabel="No purchases, expenses, or debit notes in this period." tableClassName="register-gst-table" />
+
+          {view === 'day-book' && (
+            <>
+              {dayBook?.totals && (
+                <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 13 }}>
+                  <span>Total Debit: <strong>{formatDocumentMoney(dayBook.totals.debit, 'INR')}</strong></span>
+                  <span>Total Credit: <strong>{formatDocumentMoney(dayBook.totals.credit, 'INR')}</strong></span>
+                </div>
+              )}
+              <RegisterTable
+                columns={[
+                  { key: 'date', label: 'Date' },
+                  { key: 'journal_number', label: 'Journal' },
+                  { key: 'account_code', label: 'Code' },
+                  { key: 'account_name', label: 'Account' },
+                  { key: 'particulars', label: 'Particulars' },
+                  { key: 'debit', label: 'Debit', align: 'right', render: (r) => (r.debit > 0 ? formatDocumentMoney(r.debit, 'INR') : '—') },
+                  { key: 'credit', label: 'Credit', align: 'right', render: (r) => (r.credit > 0 ? formatDocumentMoney(r.credit, 'INR') : '—') },
+                ]}
+                rows={dayBookRows}
+                emptyLabel="No journal lines in this period."
+              />
+            </>
+          )}
+
+          {view === 'sales' && (
+            <>
+              {salesRegister?.totals && (
+                <div style={{ marginBottom: 12, fontSize: 13 }}>
+                  Total invoice value: <strong>{formatDocumentMoney(salesRegister.totals.invoice_value, 'INR')}</strong>
+                  {' · '}Taxable: <strong>{formatDocumentMoney(salesRegister.totals.taxable_value, 'INR')}</strong>
+                </div>
+              )}
+              <RegisterTable columns={gstColumns} rows={salesRows} emptyLabel="No sales invoices or credit notes in this period." tableClassName="register-gst-table" />
+            </>
+          )}
+
+          {view === 'purchase' && (
+            <>
+              {purchaseRegister?.totals && (
+                <div style={{ marginBottom: 12, fontSize: 13 }}>
+                  Total value: <strong>{formatDocumentMoney(purchaseRegister.totals.invoice_value, 'INR')}</strong>
+                  {' · '}Taxable: <strong>{formatDocumentMoney(purchaseRegister.totals.taxable_value, 'INR')}</strong>
+                </div>
+              )}
+              <RegisterTable columns={gstColumns} rows={purchaseRows} emptyLabel="No purchases, expenses, or debit notes in this period." tableClassName="register-gst-table" />
+            </>
+          )}
         </>
       )}
 

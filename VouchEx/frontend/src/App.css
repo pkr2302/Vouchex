@@ -8111,6 +8111,34 @@ input:hover:not(:disabled):not(:focus), select:hover:not(:disabled):not(:focus),
   padding-left: 16px;
 }
 
+.settlement-comparison__table thead .settlement-comparison__group {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.settlement-comparison__group--left {
+  background: rgba(37, 99, 235, 0.06);
+  color: var(--accent-blue, #2563eb);
+}
+
+.settlement-comparison__group--right {
+  background: rgba(15, 118, 110, 0.08);
+  color: var(--accent-teal, #0f766e);
+}
+
+.settlement-comparison__row--open td {
+  background: rgba(245, 158, 11, 0.04);
+}
+
+.settlement-comparison__table {
+  overflow-x: auto;
+}
+
+
 .gst-badge {
   font-size: 10px;
   font-weight: 700;
