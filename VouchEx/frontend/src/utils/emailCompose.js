@@ -8,7 +8,7 @@ export function buildInvoiceEmailBody(invoice, company, customer, lineItems = []
   const cur = invoice.currency || 'INR';
   const tax = bifurcateStoredTax(invoice, invoice.place_of_supply, resolveRegisteredState(company));
   const fmt = (v) => formatDocumentMoney(v, cur);
-  const lines = [
+  return [
     `Dear ${customer?.name || invoice.customer_name || 'Customer'},`,
     '',
     'Please find below the details of your tax invoice for your records:',
@@ -25,37 +25,12 @@ export function buildInvoiceEmailBody(invoice, company, customer, lineItems = []
     `SGST: ${fmt(tax.sgst)}`,
     `IGST: ${fmt(tax.igst)}`,
     `Total Amount: ${fmt(invoice.total_amount)}`,
-    `Status: ${invoice.status}`,
-    '',
-  ];
-  if (lineItems.length > 0) {
-    lines.push('--- Line Items ---');
-    lineItems.forEach((it, idx) => {
-      const qty = it.quantity ?? 1;
-      const rate = it.unit_price ?? it.rate ?? 0;
-      const total = it.line_total ?? qty * rate;
-      lines.push(
-        `${idx + 1}. ${it.description || 'Item'} | HSN ${it.hsn_sac || '—'} | Qty ${qty} × ${fmt(rate)} = ${fmt(total)}`
-      );
-    });
-    lines.push('');
-  }
-  lines.push(
-    '--- Billing ---',
-    invoice.billing_address || '—',
-    '',
-    '--- From ---',
-    companyTradeName(company) || '',
-    `GSTIN: ${company?.gstin || '—'}`,
-    company?.address ? `${company.address}, ${company.city || ''}` : '',
-    `Contact: ${company?.email || ''} | ${company?.phone || ''}`,
     '',
     'Thank you for your business.',
     '',
     'Regards,',
     companyTradeName(company) || 'VouchEx',
-  );
-  return lines.join('\n');
+  ].join('\n');
 }
 
 export function openGmailCompose({ to, subject, body, fromEmail }) {
