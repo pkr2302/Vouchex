@@ -25,6 +25,20 @@ for (const m of html.matchAll(/\/assets\/([^"'\s>]+)/g)) {
   keep.add(m[1]);
 }
 
+// Also keep dynamically imported chunks referenced from entry JS (e.g. qrcode splits).
+for (const entry of [...keep]) {
+  if (!entry.endsWith('.js')) continue;
+  const entryPath = path.join(assetsDir, entry);
+  if (!existsSync(entryPath)) continue;
+  const js = readFileSync(entryPath, 'utf8');
+  for (const m of js.matchAll(/["'`]\.\/([A-Za-z0-9._-]+\.js)["'`]/g)) {
+    keep.add(m[1]);
+  }
+  for (const m of js.matchAll(/assets\/([A-Za-z0-9._-]+\.js)/g)) {
+    keep.add(m[1]);
+  }
+}
+
 let removed = 0;
 for (const file of readdirSync(assetsDir)) {
   if (!keep.has(file)) {

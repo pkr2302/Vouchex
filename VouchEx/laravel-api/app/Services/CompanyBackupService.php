@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\CompanySetting;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -269,6 +270,9 @@ class CompanyBackupService
         $row = (array) $row;
         unset($row['id']);
         $row['company_id'] = $companyId;
+        if (! Schema::hasColumn('company_settings', 'upi_id')) {
+            unset($row['upi_id']);
+        }
         foreach (['locked_months', 'custom_options'] as $jsonCol) {
             if (array_key_exists($jsonCol, $row) && is_array($row[$jsonCol])) {
                 $row[$jsonCol] = json_encode($row[$jsonCol]);

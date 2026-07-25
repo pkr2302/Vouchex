@@ -6456,6 +6456,32 @@ html.nav-scroll-lock .main-content {
   letter-spacing: 0.02em;
 }
 
+.pdf-upi-block {
+  margin-top: 8px;
+}
+
+.pdf-upi-qr {
+  margin-top: 8px;
+  text-align: center;
+}
+
+.pdf-upi-qr img {
+  display: inline-block;
+  width: 112px;
+  height: 112px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+}
+
+.pdf-upi-qr-hint {
+  margin: 4px 0 0;
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .pdf-payment-empty {
   margin: 8px 0 0;
   color: #94a3b8;

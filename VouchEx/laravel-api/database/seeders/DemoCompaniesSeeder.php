@@ -30,6 +30,7 @@ use App\Support\TenantContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 class DemoCompaniesSeeder extends Seeder
 {
@@ -106,7 +107,7 @@ class DemoCompaniesSeeder extends Seeder
             'subscription_plan' => 'professional',
         ]);
 
-        CompanySetting::create([
+        $settingsPayload = [
             'company_id' => $company->id,
             'name' => $cfg['name'],
             'trade_name' => $cfg['name'],
@@ -124,12 +125,15 @@ class DemoCompaniesSeeder extends Seeder
             'bank_account' => '502000'.str_pad((string) $company->id, 8, '0', STR_PAD_LEFT),
             'bank_ifsc' => 'HDFC0001234',
             'bank_branch' => 'SG Highway Branch',
-            'upi_id' => 'vouchex@okhdfcbank',
             'inactivity_timeout' => 900,
             'rcm_ledger_balance' => 8500,
             'accounting_framework' => $cfg['framework'],
             'custom_options' => ['gl_books_start_date' => '2025-04-01'],
-        ]);
+        ];
+        if (Schema::hasColumn('company_settings', 'upi_id')) {
+            $settingsPayload['upi_id'] = 'vouchex@okhdfcbank';
+        }
+        CompanySetting::create($settingsPayload);
 
         $admin = User::create([
             'company_id' => $company->id,

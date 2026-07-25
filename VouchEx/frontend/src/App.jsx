@@ -99,6 +99,7 @@ import CreditorsTab from './components/CreditorsTab';
 import CashBankTab from './components/CashBankTab';
 import CompanyAccessPicker, { UserAccessPicker } from './components/CompanyAccessPicker';
 import RegistersTab from './components/RegistersTab';
+import InvoiceUpiPayBlock from './components/InvoiceUpiPayBlock';
 import GuidedActionsTab from './components/GuidedActionsTab';
 import ComplianceCalendarPanel from './components/ComplianceCalendarPanel';
 import TasksRemindersSidebar from './components/TasksRemindersSidebar';
@@ -165,6 +166,7 @@ import { useExcelTableState } from './hooks/useExcelTableState';
 import { RegistryRowActions } from './components/RegistryRowActions';
 import MobilePortalShell from './components/mobile/MobilePortalShell';
 import { buildMobileNotifications, notificationCount } from './utils/mobileNotifications';
+import { isValidUpiId, upiValidationMessage, normalizeUpiId } from './utils/upiHelpers';
 import MobileRecentStrip from './components/mobile/MobileRecentStrip';
 import MobileRegistryCards from './components/mobile/MobileRegistryCards';
 import MobileGstrSummary from './components/mobile/MobileGstrSummary';
@@ -2525,9 +2527,13 @@ function SalesInvoicesSubTab() {
                   style={{ margin: '3px 0' }}
                 />
                 {!isBlankFieldValue(companyDetails.upi_id) && (
-                  <p className="pdf-upi-line">
-                    <strong>UPI ID:</strong> <span>{companyDetails.upi_id}</span>
-                  </p>
+                  <InvoiceUpiPayBlock
+                    upiId={companyDetails.upi_id}
+                    company={companyDetails}
+                    invoiceNumber={inv.invoice_number}
+                    amount={pdfOutstanding > 0.009 ? pdfOutstanding : 0}
+                    currency={pdfCur}
+                  />
                 )}
               </div>
               <div className="pdf-totals-box">
@@ -10733,6 +10739,11 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
       alert("SYSTEM LOCK ACTIVE: Period is locked from tampering.");
       return;
     }
+    const upiErr = upiValidationMessage(cUpiId);
+    if (upiErr) {
+      alert(upiErr);
+      return;
+    }
     setProfileSaving(true);
     try {
       const saved = await saveCompanyProfile({
@@ -10751,7 +10762,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
         bank_account_holder: cBankAccountHolder.trim(),
         bank_ifsc: cBankIfsc.trim(),
         bank_branch: cBankBranch.trim(),
-        upi_id: cUpiId.trim(),
+        upi_id: normalizeUpiId(cUpiId),
         accounting_framework: cAccountingFramework,
       });
       applyProfileFormFields(saved);
@@ -11282,7 +11293,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                 </div>
               </div>
 
-              <h4 className="form-section-title" style={{ marginTop: 20 }}>Bank &amp; UPI details (shown on invoices &amp; vouchers)</h4>
+              <h4 className="form-section-title" style={{ marginTop: 20 }}>Bank &amp; UPI details (shown on invoices)</h4>
               <div className="form-grid-2">
                 <div className="form-group">
                   <label>A/C Holder&apos;s Name</label>
@@ -11306,7 +11317,18 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                 </div>
                 <div className="form-group">
                   <label>UPI ID</label>
-                  <input type="text" className="form-input" value={cUpiId} onChange={(e) => setCUpiId(e.target.value)} readOnly={!isStaffAdmin} placeholder="e.g. company@okaxis" />
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={cUpiId}
+                    onChange={(e) => setCUpiId(e.target.value)}
+                    readOnly={!isStaffAdmin}
+                    placeholder="e.g. company@okaxis"
+                  />
+                  {cUpiId.trim() && !isValidUpiId(cUpiId) && (
+                    <p className="form-hint" style={{ color: 'var(--accent-red)' }}>{upiValidationMessage(cUpiId)}</p>
+                  )}
+                  <p className="form-hint">Shown on invoice PDF with a scan-to-pay QR for the outstanding amount.</p>
                 </div>
               </div>
 
