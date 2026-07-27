@@ -1140,7 +1140,6 @@ class PortalMutationController extends Controller
             'bank_account_holder' => 'nullable|string|max:255',
             'bank_ifsc' => 'nullable|string|max:20',
             'bank_branch' => 'nullable|string|max:255',
-            'upi_id' => ['nullable', 'string', 'max:100', 'regex:/^[a-zA-Z0-9.\\-_]{2,256}@[a-zA-Z][a-zA-Z0-9.\\-]{1,63}$/'],
             'logo' => 'nullable|string|max:500000',
             'is_financial_year_locked' => 'boolean',
             'locked_months' => 'nullable|array',
@@ -1159,13 +1158,7 @@ class PortalMutationController extends Controller
 
         unset($data['inactivity_timeout']);
 
-        if (array_key_exists('upi_id', $data) && ! Schema::hasColumn('company_settings', 'upi_id')) {
-            return response()->json([
-                'message' => 'UPI ID cannot be saved yet: database column is missing. Run pending migrations (or add company_settings.upi_id), then try again.',
-                'error' => 'Missing column company_settings.upi_id',
-                'cause' => 'The upi_id migration has not been applied on this database.',
-            ], 503);
-        }
+        unset($data['upi_id']);
 
         $company = PortalDataService::companyRecord();
         $company->fill($data);

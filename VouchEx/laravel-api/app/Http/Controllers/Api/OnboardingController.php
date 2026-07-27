@@ -10,7 +10,6 @@ use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -124,7 +123,6 @@ class OnboardingController extends Controller
             'bank_account_holder' => 'nullable|string|max:255',
             'bank_ifsc' => 'nullable|string|max:20',
             'bank_branch' => 'nullable|string|max:255',
-            'upi_id' => ['nullable', 'string', 'max:100', 'regex:/^[a-zA-Z0-9.\\-_]{2,256}@[a-zA-Z][a-zA-Z0-9.\\-]{1,63}$/'],
         ]);
 
         $company = Company::findOrFail($user->company_id);
@@ -135,18 +133,11 @@ class OnboardingController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        if (array_key_exists('upi_id', $data) && filled($data['upi_id'] ?? null) && ! Schema::hasColumn('company_settings', 'upi_id')) {
-            return response()->json([
-                'message' => 'UPI ID cannot be saved yet: database column is missing. Run pending migrations first.',
-            ], 503);
-        }
+        unset($data['upi_id']);
 
         DB::transaction(function () use ($data, $user, $company) {
             $company->update(['name' => trim($data['name'])]);
             $settings = CompanySetting::where('company_id', $company->id)->firstOrFail();
-            if (array_key_exists('upi_id', $data) && ! Schema::hasColumn('company_settings', 'upi_id')) {
-                unset($data['upi_id']);
-            }
             $settings->fill($data);
             $settings->name = trim($data['name']);
             $settings->trade_name = trim($data['trade_name'] ?? $data['name']);
