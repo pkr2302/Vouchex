@@ -595,10 +595,122 @@ export function InlineInventoryModal({ open, onClose, onCreated }) {
   );
 }
 
-export function LineItemTaxRow({ line, index, onChange, onRemove, canRemove, placeOfSupply, companyState, inventory, documentCurrency = 'INR', dense = false }) {
+export function LineItemTaxRow({
+  line,
+  index,
+  onChange,
+  onRemove,
+  canRemove,
+  placeOfSupply,
+  companyState,
+  inventory,
+  documentCurrency = 'INR',
+  dense = false,
+  showRowNumber = false,
+  rowNumber = null,
+}) {
   const handle = (field, value) => onChange(index, field, value);
   const isManual = !line.product_id || line.product_id === '';
   const serviceLine = isServiceLine(line, inventory);
+  const displayRowNo = rowNumber != null ? rowNumber : index + 1;
+
+  if (dense) {
+    return (
+      <tr className="line-item-row line-item-row--editor">
+        <td colSpan={9} className="line-item-editor-cell">
+          <div className={`line-item-editor-card${showRowNumber ? ' line-item-editor-card--numbered' : ''}`}>
+            {showRowNumber && (
+              <div className="line-item-editor-sno" aria-label={`Line ${displayRowNo}`}>
+                {displayRowNo}
+              </div>
+            )}
+            <div className="line-item-editor-field line-item-editor-product">
+              <label>Product / service</label>
+              <select
+                className="form-input"
+                value={isManual ? MANUAL_SELECT_VALUE : String(line.product_id || '')}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === MANUAL_SELECT_VALUE || v === '') {
+                    handle('product_id', '');
+                    return;
+                  }
+                  handle('product_id', v);
+                }}
+              >
+                <option value="">-- Item --</option>
+                <option value={MANUAL_SELECT_VALUE}>+ Type manually…</option>
+                {inventory.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="line-item-editor-field line-item-editor-description">
+              <label>Description</label>
+              <textarea
+                className="form-input line-item-desc-input"
+                placeholder="Describe the goods or services supplied…"
+                rows={3}
+                value={line.description}
+                onChange={(e) => handle('description', e.target.value)}
+              />
+              <input
+                className="form-input line-item-detail-input"
+                placeholder="Additional detail / specification (optional)"
+                value={line.item_detail || ''}
+                onChange={(e) => handle('item_detail', e.target.value)}
+              />
+            </div>
+
+            <div className="line-item-editor-numbers">
+              <div className="line-item-editor-field">
+                <label>HSN/SAC</label>
+                <input className="form-input" placeholder="Code" value={line.hsn_sac} onChange={(e) => handle('hsn_sac', e.target.value)} />
+              </div>
+              <div className="line-item-editor-field">
+                <label>Quantity</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  placeholder={serviceLine ? 'Optional' : 'Qty'}
+                  min={serviceLine ? 0 : 0.001}
+                  step="any"
+                  value={line.quantity === '' || line.quantity == null ? '' : line.quantity}
+                  onChange={(e) => handle('quantity', e.target.value === '' ? '' : parseFloat(e.target.value))}
+                />
+              </div>
+              <div className="line-item-editor-field">
+                <label>Rate ({documentCurrency})</label>
+                <input type="number" className="form-input" placeholder="0.00" value={line.rate} onChange={(e) => handle('rate', parseFloat(e.target.value) || 0)} />
+              </div>
+              <div className="line-item-editor-field">
+                <label>GST %</label>
+                <input type="number" className="form-input" placeholder="0" value={line.tax_rate_override} onChange={(e) => handle('tax_rate_override', e.target.value)} />
+              </div>
+              <div className="line-item-editor-field">
+                <label>Supply</label>
+                <select className="form-input" value={line.supply_mechanism || 'FCM'} onChange={(e) => handle('supply_mechanism', e.target.value)}>
+                  {SUPPLY_MECHANISMS.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div className="line-item-editor-tax" aria-label="Tax preview">
+                <span>CGST <strong>₹{(line.cgst || 0).toFixed(0)}</strong></span>
+                <span>SGST <strong>₹{(line.sgst || 0).toFixed(0)}</strong></span>
+                <span>IGST <strong>₹{(line.igst || 0).toFixed(0)}</strong></span>
+              </div>
+            </div>
+
+            {canRemove && (
+              <button type="button" className="line-item-editor-remove" onClick={() => onRemove(index)} aria-label={`Remove line item ${index + 1}`}>
+                ✕
+              </button>
+            )}
+          </div>
+        </td>
+      </tr>
+    );
+  }
 
   return (
     <tr className={`line-item-row${dense ? ' line-item-row--dense' : ''}`}>

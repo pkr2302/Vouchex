@@ -1084,6 +1084,7 @@ function SalesInvoicesSubTab() {
   const [conversionRate, setConversionRate] = useState('1.00');
   const [exportTreatment, setExportTreatment] = useState('');
   const [printPlaceOfSupplyOnPdf, setPrintPlaceOfSupplyOnPdf] = useState(true);
+  const [showRowNumbersOnPdf, setShowRowNumbersOnPdf] = useState(false);
 
   // Items State
   const [lineItems, setLineItems] = useState([emptyLineItem()]);
@@ -1380,6 +1381,7 @@ function SalesInvoicesSubTab() {
     setExportCountry(inv.export_country || '');
     setExportTreatment(inv.export_treatment || '');
     setPrintPlaceOfSupplyOnPdf(inv.print_place_of_supply_on_pdf !== false);
+    setShowRowNumbersOnPdf(inv.show_row_numbers_on_pdf === true);
     setCurrency(inv.currency || 'INR');
     setConversionRate(String(inv.conversion_rate ?? '1.00'));
     setDiscountValue(toAmount(inv.discount));
@@ -1426,6 +1428,7 @@ function SalesInvoicesSubTab() {
     setExportCountry('');
     setExportTreatment('');
     setPrintPlaceOfSupplyOnPdf(true);
+    setShowRowNumbersOnPdf(false);
     setCurrency('INR');
     setConversionRate('1.00');
     setApplyAdvanceOnInvoice(false);
@@ -1629,6 +1632,7 @@ function SalesInvoicesSubTab() {
         export_country: isExportPlaceOfSupply(placeOfSupply) ? exportCountry.trim() : null,
         export_treatment: isExportPlaceOfSupply(placeOfSupply) ? exportTreatment : null,
         print_place_of_supply_on_pdf: printPlaceOfSupplyOnPdf,
+        show_row_numbers_on_pdf: showRowNumbersOnPdf,
         currency: currency || 'INR',
         conversion_rate: currency === 'INR' ? 1 : (parseFloat(conversionRate) || 1),
         gstin: clientTaxId,
@@ -1940,6 +1944,16 @@ function SalesInvoicesSubTab() {
                   Print POS
                 </label>
               </div>
+              <div className="form-group billing-sheet__check-wrap">
+                <label className="billing-sheet__check">
+                  <input
+                    type="checkbox"
+                    checked={showRowNumbersOnPdf}
+                    onChange={(e) => setShowRowNumbersOnPdf(e.target.checked)}
+                  />
+                  Row no.
+                </label>
+              </div>
               <div className="form-group billing-sheet__addr-field">
                 <label>Billing</label>
                 <input
@@ -2013,7 +2027,7 @@ function SalesInvoicesSubTab() {
                 </div>
               </div>
               <div className="invoice-items-scroll">
-                <table className="invoice-items-table">
+                <table className="invoice-items-table invoice-items-table--editor">
                   <thead>
                     <tr>
                       <th>Product</th>
@@ -2041,6 +2055,8 @@ function SalesInvoicesSubTab() {
                         inventory={inventory}
                         documentCurrency={currency}
                         dense
+                        showRowNumber={showRowNumbersOnPdf}
+                        rowNumber={idx + 1}
                       />
                     ))}
                   </tbody>
@@ -2360,6 +2376,8 @@ function SalesInvoicesSubTab() {
         const inv = selectedInvoiceForPDF;
         const pdfLineItems = invoiceItems.filter((item) => sameId(item.invoice_id, inv.id));
         const showQty = invoicePdfShowsQtyColumn(pdfLineItems, inventory);
+        const showRowNos = inv.show_row_numbers_on_pdf === true;
+        const pdfColCount = (showRowNos ? 1 : 0) + (showQty ? 5 : 4);
         const pdfCur = inv.currency || 'INR';
         const pdfSym = getCurrencySymbol(pdfCur);
         const pdfFmt = (v) => formatPdfDocument(v, pdfCur);
@@ -2450,6 +2468,7 @@ function SalesInvoicesSubTab() {
             <table className="pdf-meta-table pdf-invoice-items-table">
               <thead>
                 <tr>
+                  {showRowNos && <th className="pdf-col-sno">#</th>}
                   <th className="pdf-col-desc">Item Description</th>
                   <th>HSN/SAC</th>
                   {showQty && <th className="pdf-col-num">Qty</th>}
@@ -2460,7 +2479,7 @@ function SalesInvoicesSubTab() {
               <tbody>
                 {pdfLineItems.length === 0 ? (
                   <tr>
-                    <td colSpan={showQty ? 5 : 4} className="pdf-invoice-empty-items">
+                    <td colSpan={pdfColCount} className="pdf-invoice-empty-items">
                       No line items found for this invoice.
                     </td>
                   </tr>
@@ -2472,6 +2491,7 @@ function SalesInvoicesSubTab() {
                       const showLineQty = lineHasDisplayQuantity(lineForQty, inventory);
                       return (
                         <tr key={idx}>
+                          {showRowNos && <td className="pdf-col-sno">{idx + 1}</td>}
                           <td>{formatItemDisplay(item.description, item.item_detail)}</td>
                           <td>{item.hsn_sac}</td>
                           {showQty && (
@@ -2487,7 +2507,7 @@ function SalesInvoicesSubTab() {
                       );
                     })}
                     <tr className="pdf-items-total-row">
-                      <td colSpan={showQty ? 4 : 3} className="pdf-items-total-spacer" />
+                      <td colSpan={pdfColCount - 1} className="pdf-items-total-spacer" />
                       <td className="pdf-col-num pdf-items-total-amount">
                         {pdfFmt(itemsAmountTotal)}
                       </td>

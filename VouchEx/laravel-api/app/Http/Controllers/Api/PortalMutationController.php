@@ -190,7 +190,7 @@ class PortalMutationController extends Controller
                 ? $requestedNumber
                 : $this->numbers->next('INV', 'invoices', 'invoice_number');
 
-            $invoice = Invoice::create([
+            $invoiceAttrs = [
                 'company_id' => $companyId,
                 'invoice_number' => $number,
                 'invoice_type' => $inv['invoice_type'] ?? 'B2B',
@@ -223,7 +223,14 @@ class PortalMutationController extends Controller
                 'status' => $inv['status'] ?? 'Unpaid',
                 'created_by' => $user->id,
                 'created_by_name' => $user->name,
-            ]);
+            ];
+            if (Schema::hasColumn('invoices', 'show_row_numbers_on_pdf')) {
+                $invoiceAttrs['show_row_numbers_on_pdf'] = array_key_exists('show_row_numbers_on_pdf', $inv)
+                    ? filter_var($inv['show_row_numbers_on_pdf'], FILTER_VALIDATE_BOOLEAN)
+                    : false;
+            }
+
+            $invoice = Invoice::create($invoiceAttrs);
 
             foreach ($data['items'] as $item) {
                 $productId = !empty($item['product_id']) ? (int) $item['product_id'] : null;
@@ -1399,6 +1406,13 @@ class PortalMutationController extends Controller
         }
         if (array_key_exists('currency', $inv)) {
             $inv['currency'] = $this->normalizeDocumentCurrency($inv['currency']);
+        }
+        if (array_key_exists('show_row_numbers_on_pdf', $inv)) {
+            if (Schema::hasColumn('invoices', 'show_row_numbers_on_pdf')) {
+                $inv['show_row_numbers_on_pdf'] = filter_var($inv['show_row_numbers_on_pdf'], FILTER_VALIDATE_BOOLEAN);
+            } else {
+                unset($inv['show_row_numbers_on_pdf']);
+            }
         }
         DB::transaction(function () use ($invoice, $inv, $data) {
             $invoice->update(array_merge($inv, [
