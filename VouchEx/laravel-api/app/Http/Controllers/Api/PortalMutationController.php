@@ -1163,7 +1163,8 @@ class PortalMutationController extends Controller
         unset($data['upi_id']);
 
         $signatoryName = array_key_exists('signatory_name', $data) ? $data['signatory_name'] : null;
-        $clearSignature = array_key_exists('signature_image', $data) && trim((string) ($data['signature_image'] ?? '')) === '';
+        $hasSignature = array_key_exists('signature_image', $data);
+        $signatureValue = trim((string) ($data['signature_image'] ?? ''));
         unset($data['signatory_name'], $data['signature_image']);
 
         $company = PortalDataService::companyRecord();
@@ -1172,8 +1173,8 @@ class PortalMutationController extends Controller
         if ($signatoryName !== null) {
             PortalDataService::setSignatoryName($company, $signatoryName);
         }
-        if ($clearSignature) {
-            PortalDataService::setSignatureImagePath($company, '');
+        if ($hasSignature) {
+            PortalDataService::setSignatureImagePath($company, $signatureValue);
         }
 
         $company->save();
@@ -1225,7 +1226,7 @@ class PortalMutationController extends Controller
         $file->storeAs($dir, 'logo.'.$ext, 'public');
 
         $relative = '/storage/'.$dir.'/logo.'.$ext;
-        $publicUrl = rtrim(config('app.url'), '/').$relative;
+        $publicUrl = url($relative);
 
         $layout = 'compact';
         $size = @getimagesize($file->getRealPath());
@@ -1281,13 +1282,23 @@ class PortalMutationController extends Controller
             }
         }
 
+        $raw = (string) file_get_contents($file->getRealPath());
         $file->storeAs($dir, 'signature.'.$ext, 'public');
 
         $relative = '/storage/'.$dir.'/signature.'.$ext;
-        $publicUrl = rtrim(config('app.url'), '/').$relative;
+        $publicUrl = url($relative);
 
-        PortalDataService::setSignatureImagePath($company, $relative);
+        // Small signatures are inlined so invoice PDFs render them without a storage symlink.
+        $mime = $ext === 'jpg' ? 'jpeg' : $ext;
+        $dataUrl = 'data:image/'.$mime.';base64,'.base64_encode($raw);
+        $stored = strlen($dataUrl) <= 480000 ? $dataUrl : $relative;
+
+        PortalDataService::setSignatureImagePath($company, $stored);
         $company->save();
+
+        if ($stored !== $relative) {
+            $publicUrl = $stored;
+        }
 
         $this->sync->bump('settings', 'update', $company->id, $request->user()->id);
 

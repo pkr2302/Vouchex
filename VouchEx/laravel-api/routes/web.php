@@ -28,6 +28,20 @@ Route::get('/terms-of-service', function () {
         ->header('X-Robots-Tag', 'noindex, nofollow');
 });
 
+// cPanel FTP deploys cannot create the public/storage symlink, so serve uploads directly.
+Route::get('/storage/{path}', function (string $path) {
+    if (str_contains($path, '..')) {
+        abort(404);
+    }
+
+    $full = storage_path('app/public/'.$path);
+    if (! File::exists($full) || is_dir($full)) {
+        abort(404);
+    }
+
+    return response()->file($full);
+})->where('path', '.*');
+
 Route::get('/sitemap.xml', function () {
     $path = public_path('sitemap.xml');
     if (! File::exists($path)) {

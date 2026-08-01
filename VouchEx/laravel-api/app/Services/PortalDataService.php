@@ -432,6 +432,13 @@ class PortalDataService
 
     public static function resolveSignatureImagePath(CompanySetting $company): string
     {
+        $custom = trim((string) (($company->custom_options ?? [])['signature_image'] ?? ''));
+
+        // Inlined signatures live only in custom_options; the column holds at most a path.
+        if (str_starts_with($custom, 'data:image/')) {
+            return $custom;
+        }
+
         if (Schema::hasColumn('company_settings', 'signature_image')) {
             $path = trim((string) ($company->signature_image ?? ''));
             if ($path !== '') {
@@ -439,7 +446,7 @@ class PortalDataService
             }
         }
 
-        return trim((string) (($company->custom_options ?? [])['signature_image'] ?? ''));
+        return $custom;
     }
 
     /** Persist signatory name on dedicated column when present, else custom_options. */
@@ -464,7 +471,9 @@ class PortalDataService
     {
         $clean = trim((string) $path);
         if (Schema::hasColumn('company_settings', 'signature_image')) {
-            $company->signature_image = $clean !== '' ? $clean : null;
+            // Column is varchar(500) — only short paths fit; data URLs go to custom_options.
+            $fitsColumn = $clean !== '' && strlen($clean) <= 450 && ! str_starts_with($clean, 'data:image/');
+            $company->signature_image = $fitsColumn ? $clean : null;
         }
 
         $custom = is_array($company->custom_options) ? $company->custom_options : [];
@@ -488,7 +497,8 @@ class PortalDataService
         }
 
         if (str_starts_with($logo, '/storage/')) {
-            return rtrim(config('app.url'), '/').$logo;
+            // url() resolves against the live request host; APP_URL is often stale on cPanel.
+            return url($logo);
         }
 
         if (str_starts_with($logo, 'data:image/')) {
