@@ -2566,6 +2566,28 @@ function SalesInvoicesSubTab() {
               </div>
             </div>
 
+            <div className="pdf-signatory-wrap">
+              <div className="pdf-signatory-block">
+                {companyDetails.signature_image ? (
+                  <img
+                    src={companyDetails.signature_image}
+                    alt=""
+                    className="pdf-signatory-image"
+                  />
+                ) : (
+                  <div className="pdf-signatory-image-spacer" aria-hidden />
+                )}
+                <div className="pdf-signatory-line" />
+                <p className="pdf-signatory-name">
+                  {companyDetails.signatory_name?.trim() || 'Authorised Signatory'}
+                </p>
+                <p className="pdf-signatory-label">Authorised Signatory</p>
+                {!isBlankFieldValue(companyDetails.name) && (
+                  <p className="pdf-signatory-company">{companyDetails.name}</p>
+                )}
+              </div>
+            </div>
+
             <p className="pdf-invoice-thanks">Thank you for your business.</p>
           </div>
         </PdfPrintModal>
@@ -10480,6 +10502,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
     companyDetails, 
     saveCompanyProfile,
     uploadCompanyLogo,
+    uploadCompanySignature,
     patchCompanyDetailsLocal, 
     users, 
     loginLogs, 
@@ -10569,6 +10592,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
   const [cBankAccountHolder, setCBankAccountHolder] = useState(companyDetails.bank_account_holder || '');
   const [cBankIfsc, setCBankIfsc] = useState(companyDetails.bank_ifsc || '');
   const [cBankBranch, setCBankBranch] = useState(companyDetails.bank_branch || '');
+  const [cSignatoryName, setCSignatoryName] = useState(companyDetails.signatory_name || '');
   const [cAccountingFramework, setCAccountingFramework] = useState(companyDetails.accounting_framework || 'AS');
   const [profileSaving, setProfileSaving] = useState(false);
 
@@ -10589,6 +10613,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
     setCBankAccountHolder(details.bank_account_holder || '');
     setCBankIfsc(details.bank_ifsc || '');
     setCBankBranch(details.bank_branch || '');
+    setCSignatoryName(details.signatory_name || '');
     setCAccountingFramework(details.accounting_framework || 'AS');
   };
 
@@ -10744,6 +10769,7 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
         bank_account_holder: cBankAccountHolder.trim(),
         bank_ifsc: cBankIfsc.trim(),
         bank_branch: cBankBranch.trim(),
+        signatory_name: cSignatoryName.trim(),
         accounting_framework: cAccountingFramework,
       });
       applyProfileFormFields(saved);
@@ -10919,6 +10945,31 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
       patchCompanyDetailsLocal((prev) => ({ ...prev, logo: '', logo_layout: 'auto' }));
     } catch (err) {
       showApiError('Removing company logo', err);
+    }
+  };
+
+  const handleSignatureUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !isStaffAdmin) return;
+    setProfileSaving(true);
+    try {
+      await uploadCompanySignature(file);
+      alert('Authorised signature saved. It will print on invoice PDFs.');
+    } catch (err) {
+      showApiError('Uploading signature', err);
+    } finally {
+      setProfileSaving(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveSignature = async () => {
+    if (!isStaffAdmin) return;
+    try {
+      await saveCompanyProfile({ signature_image: '' });
+      patchCompanyDetailsLocal((prev) => ({ ...prev, signature_image: '' }));
+    } catch (err) {
+      showApiError('Removing signature', err);
     }
   };
 
@@ -11295,6 +11346,60 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
                 <div className="form-group">
                   <label>Branch</label>
                   <input type="text" className="form-input" value={cBankBranch} onChange={(e) => setCBankBranch(e.target.value)} readOnly={!isStaffAdmin} />
+                </div>
+              </div>
+
+              <h4 className="form-section-title" style={{ marginTop: 20 }}>Invoice signatory</h4>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label>Authorised Signatory Name</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={cSignatoryName}
+                    onChange={(e) => setCSignatoryName(e.target.value)}
+                    readOnly={!isStaffAdmin}
+                    placeholder="e.g. Rajesh Sharma"
+                  />
+                  <p className="form-hint">Printed under the signature on sales invoice PDFs.</p>
+                </div>
+                <div className="form-group">
+                  <label>Signature image</label>
+                  <div className="signature-upload-box">
+                    {companyDetails.signature_image ? (
+                      <div className="signature-upload-preview">
+                        <img src={companyDetails.signature_image} alt="Authorised signature" />
+                        {isStaffAdmin && (
+                          <button type="button" className="btn-secondary" onClick={handleRemoveSignature}>
+                            Remove signature
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="form-hint" style={{ marginBottom: 8 }}>
+                        Upload a clear PNG/JPG of the handwritten signature (transparent PNG works best). Max 5 MB.
+                      </p>
+                    )}
+                    {isStaffAdmin && (
+                      <>
+                        <input
+                          id="settings-signature-upload"
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                          style={{ display: 'none' }}
+                          onChange={handleSignatureUpload}
+                        />
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          disabled={profileSaving}
+                          onClick={() => document.getElementById('settings-signature-upload')?.click()}
+                        >
+                          {companyDetails.signature_image ? 'Replace signature' : 'Upload signature'}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 

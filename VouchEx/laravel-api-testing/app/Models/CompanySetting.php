@@ -29,6 +29,8 @@ class CompanySetting extends Model
         'bank_ifsc',
         'bank_branch',
         'upi_id',
+        'signatory_name',
+        'signature_image',
         'logo',
         'is_financial_year_locked',
         'locked_months',

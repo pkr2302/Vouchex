@@ -1140,6 +1140,8 @@ class PortalMutationController extends Controller
             'bank_account_holder' => 'nullable|string|max:255',
             'bank_ifsc' => 'nullable|string|max:20',
             'bank_branch' => 'nullable|string|max:255',
+            'signatory_name' => 'nullable|string|max:255',
+            'signature_image' => 'nullable|string|max:500000',
             'logo' => 'nullable|string|max:500000',
             'is_financial_year_locked' => 'boolean',
             'locked_months' => 'nullable|array',
@@ -1160,8 +1162,20 @@ class PortalMutationController extends Controller
 
         unset($data['upi_id']);
 
+        $signatoryName = array_key_exists('signatory_name', $data) ? $data['signatory_name'] : null;
+        $clearSignature = array_key_exists('signature_image', $data) && trim((string) ($data['signature_image'] ?? '')) === '';
+        unset($data['signatory_name'], $data['signature_image']);
+
         $company = PortalDataService::companyRecord();
         $company->fill($data);
+
+        if ($signatoryName !== null) {
+            PortalDataService::setSignatoryName($company, $signatoryName);
+        }
+        if ($clearSignature) {
+            PortalDataService::setSignatureImagePath($company, '');
+        }
+
         $company->save();
 
         if (isset($data['name']) && $data['name'] !== '') {
@@ -1225,6 +1239,50 @@ class PortalMutationController extends Controller
         return response()->json([
             'success' => true,
             'logo' => $publicUrl,
+            'companyDetails' => PortalDataService::formatCompanyDetails($company->fresh()),
+        ]);
+    }
+
+    public function uploadCompanySignature(Request $request): JsonResponse
+    {
+        if (!$request->user()->isAdmin()) {
+            return response()->json(['message' => 'Only administrators can update the authorised signature.'], 403);
+        }
+
+        $request->validate([
+            'signature' => 'required|file|mimes:jpg,jpeg,png,webp,gif|max:5120',
+        ]);
+
+        $file = $request->file('signature');
+        $ext = strtolower($file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'png');
+        if (! in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true)) {
+            $ext = 'png';
+        }
+
+        $company = PortalDataService::companyRecord();
+        $companyId = $company->company_id;
+        $dir = 'company/'.$companyId;
+        Storage::disk('public')->makeDirectory($dir);
+
+        foreach (Storage::disk('public')->files($dir) as $old) {
+            if (str_starts_with(basename($old), 'signature.')) {
+                Storage::disk('public')->delete($old);
+            }
+        }
+
+        $file->storeAs($dir, 'signature.'.$ext, 'public');
+
+        $relative = '/storage/'.$dir.'/signature.'.$ext;
+        $publicUrl = rtrim(config('app.url'), '/').$relative;
+
+        PortalDataService::setSignatureImagePath($company, $relative);
+        $company->save();
+
+        $this->sync->bump('settings', 'update', $company->id, $request->user()->id);
+
+        return response()->json([
+            'success' => true,
+            'signature_image' => $publicUrl,
             'companyDetails' => PortalDataService::formatCompanyDetails($company->fresh()),
         ]);
     }

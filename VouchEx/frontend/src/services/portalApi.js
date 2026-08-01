@@ -164,6 +164,12 @@ export const portalApi = {
     return apiUpload('/settings/company/logo', form);
   },
 
+  uploadCompanySignature: (file) => {
+    const form = new FormData();
+    form.append('signature', file, file.name || 'company-signature.png');
+    return apiUpload('/settings/company/signature', form);
+  },
+
   listCompanies: () => apiRequest('/companies'),
   createCompany: (payload) => apiRequest('/companies', { method: 'POST', body: payload }),
   updateCompanyMeta: (id, payload) => apiRequest(`/companies/${id}`, { method: 'PUT', body: payload }),

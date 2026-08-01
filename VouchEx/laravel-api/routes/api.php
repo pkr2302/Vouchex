@@ -104,6 +104,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/settings/cash-ledgers/{id}', [PortalMutationController::class, 'deleteCashLedger']);
         Route::put('/settings/company', [PortalMutationController::class, 'updateCompany']);
         Route::post('/settings/company/logo', [PortalMutationController::class, 'uploadCompanyLogo']);
+        Route::post('/settings/company/signature', [PortalMutationController::class, 'uploadCompanySignature']);
 
         Route::get('/gst-compliance/settings', [\App\Http\Controllers\Api\GstComplianceController::class, 'showSettings']);
         Route::put('/gst-compliance/settings', [\App\Http\Controllers\Api\GstComplianceController::class, 'updateSettings']);

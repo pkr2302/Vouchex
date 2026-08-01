@@ -356,6 +356,8 @@ class PortalDataService
                 'bank_ifsc' => '',
                 'bank_branch' => '',
                 'upi_id' => '',
+                'signatory_name' => '',
+                'signature_image' => '',
                 'logo' => '',
                 'logo_layout' => 'auto',
                 'accounting_framework' => 'AS',
@@ -404,12 +406,74 @@ class PortalDataService
             'bank_account_holder' => $company->bank_account_holder ?? '',
             'bank_ifsc' => $company->bank_ifsc ?? '',
             'bank_branch' => $company->bank_branch ?? '',
-            'upi_id' => $company->upi_id ?? '',
+            'upi_id' => Schema::hasColumn('company_settings', 'upi_id')
+                ? ($company->upi_id ?? '')
+                : '',
+            'signatory_name' => self::resolveSignatoryName($company),
+            'signature_image' => self::resolveCompanyLogo(self::resolveSignatureImagePath($company)),
             'logo' => self::resolveCompanyLogo($company->logo ?? ''),
             'logo_layout' => ($company->custom_options ?? [])['logo_layout'] ?? 'auto',
             'accounting_framework' => $company->accounting_framework ?? 'AS',
             'gst_compliance' => GstComplianceSettings::forFrontend($company),
         ];
+    }
+
+    public static function resolveSignatoryName(CompanySetting $company): string
+    {
+        if (Schema::hasColumn('company_settings', 'signatory_name')) {
+            $name = trim((string) ($company->signatory_name ?? ''));
+            if ($name !== '') {
+                return $name;
+            }
+        }
+
+        return trim((string) (($company->custom_options ?? [])['signatory_name'] ?? ''));
+    }
+
+    public static function resolveSignatureImagePath(CompanySetting $company): string
+    {
+        if (Schema::hasColumn('company_settings', 'signature_image')) {
+            $path = trim((string) ($company->signature_image ?? ''));
+            if ($path !== '') {
+                return $path;
+            }
+        }
+
+        return trim((string) (($company->custom_options ?? [])['signature_image'] ?? ''));
+    }
+
+    /** Persist signatory name on dedicated column when present, else custom_options. */
+    public static function setSignatoryName(CompanySetting $company, ?string $name): void
+    {
+        $clean = trim((string) $name);
+        if (Schema::hasColumn('company_settings', 'signatory_name')) {
+            $company->signatory_name = $clean !== '' ? $clean : null;
+        }
+
+        $custom = is_array($company->custom_options) ? $company->custom_options : [];
+        if ($clean === '') {
+            unset($custom['signatory_name']);
+        } else {
+            $custom['signatory_name'] = $clean;
+        }
+        $company->custom_options = $custom;
+    }
+
+    /** Persist signature image path on dedicated column when present, else custom_options. */
+    public static function setSignatureImagePath(CompanySetting $company, ?string $path): void
+    {
+        $clean = trim((string) $path);
+        if (Schema::hasColumn('company_settings', 'signature_image')) {
+            $company->signature_image = $clean !== '' ? $clean : null;
+        }
+
+        $custom = is_array($company->custom_options) ? $company->custom_options : [];
+        if ($clean === '') {
+            unset($custom['signature_image']);
+        } else {
+            $custom['signature_image'] = $clean;
+        }
+        $company->custom_options = $custom;
     }
 
     /** File path, full URL, or legacy base64 data URL for company logo. */

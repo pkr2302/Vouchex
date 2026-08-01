@@ -19,6 +19,12 @@ export default function AuthPage({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const googleBtnRef = useRef(null);
+  const googleCredentialRef = useRef(onGoogleCredential);
+  const gsiClientIdRef = useRef(null);
+
+  useEffect(() => {
+    googleCredentialRef.current = onGoogleCredential;
+  }, [onGoogleCredential]);
 
   useEffect(() => {
     setMode(initialMode);
@@ -28,23 +34,31 @@ export default function AuthPage({
     const clientId = publicConfig?.google_client_id;
     if (!clientId || !googleBtnRef.current || !onGoogleCredential) return undefined;
 
+    let cancelled = false;
+
     const renderButton = () => {
-      if (!window.google?.accounts?.id) return;
-      const buttonWidth = Math.min(320, Math.max(240, window.innerWidth - 56));
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: (response) => {
-          if (response?.credential) {
+      const idApi = window.google?.accounts?.id;
+      if (cancelled || !idApi || !googleBtnRef.current) return;
+
+      // initialize() must run once per client id; repeat calls make GSI drop earlier instances.
+      if (gsiClientIdRef.current !== clientId) {
+        idApi.initialize({
+          client_id: clientId,
+          callback: (response) => {
+            if (!response?.credential) return;
             setError('');
             setBusy(true);
-            onGoogleCredential(response.credential)
+            Promise.resolve(googleCredentialRef.current?.(response.credential))
               .catch((err) => setError(formatApiError(err, 'Google sign-in')))
               .finally(() => setBusy(false));
-          }
-        },
-      });
+          },
+        });
+        gsiClientIdRef.current = clientId;
+      }
+
+      const buttonWidth = Math.min(320, Math.max(240, window.innerWidth - 56));
       googleBtnRef.current.innerHTML = '';
-      window.google.accounts.id.renderButton(googleBtnRef.current, {
+      idApi.renderButton(googleBtnRef.current, {
         theme: 'outline',
         size: 'large',
         width: buttonWidth,
@@ -54,17 +68,24 @@ export default function AuthPage({
 
     if (window.google?.accounts?.id) {
       renderButton();
-      return undefined;
+      return () => {
+        cancelled = true;
+      };
     }
 
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.onload = renderButton;
-    document.body.appendChild(script);
+    const SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
+    let script = document.querySelector(`script[src="${SCRIPT_SRC}"]`);
+    if (!script) {
+      script = document.createElement('script');
+      script.src = SCRIPT_SRC;
+      script.async = true;
+      document.body.appendChild(script);
+    }
+    script.addEventListener('load', renderButton);
 
     return () => {
-      script.onload = null;
+      cancelled = true;
+      script.removeEventListener('load', renderButton);
     };
   }, [publicConfig?.google_client_id, mode, onGoogleCredential]);
 

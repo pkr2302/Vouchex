@@ -28,6 +28,8 @@ const EMPTY_COMPANY = {
   bank_ifsc: '',
   bank_branch: '',
   upi_id: '',
+  signatory_name: '',
+  signature_image: '',
   logo: '',
   logo_layout: 'auto',
   accounting_framework: 'AS',
@@ -539,6 +541,7 @@ export const SimulatorProvider = ({ children }) => {
     bank_ifsc: details.bank_ifsc ?? '',
     bank_branch: details.bank_branch ?? '',
     upi_id: details.upi_id ?? '',
+    signatory_name: details.signatory_name ?? '',
     logo: details.logo ?? '',
     accounting_framework: details.accounting_framework ?? 'AS',
   });
@@ -557,6 +560,11 @@ export const SimulatorProvider = ({ children }) => {
     const payload = companyProfilePayload(merged);
     if (!Object.prototype.hasOwnProperty.call(partial, 'logo')) {
       delete payload.logo;
+    }
+    if (!Object.prototype.hasOwnProperty.call(partial, 'signature_image')) {
+      delete payload.signature_image;
+    } else {
+      payload.signature_image = partial.signature_image ?? '';
     }
     const res = await portalApi.updateCompany(payload);
     const saved = res?.companyDetails
@@ -579,6 +587,17 @@ export const SimulatorProvider = ({ children }) => {
     }
     addConsoleLog('route', 'POST /api/settings/company/logo', 'Logo file stored on server storage.');
     return res?.companyDetails?.logo || res?.logo;
+  };
+
+  const uploadCompanySignature = async (file) => {
+    const res = await portalApi.uploadCompanySignature(file);
+    if (res?.companyDetails) {
+      setCompanyDetailsState(res.companyDetails);
+    } else if (res?.signature_image) {
+      setCompanyDetailsState((prev) => ({ ...prev, signature_image: res.signature_image }));
+    }
+    addConsoleLog('route', 'POST /api/settings/company/signature', 'Signature image stored on server storage.');
+    return res?.companyDetails?.signature_image || res?.signature_image;
   };
 
   const saveGstComplianceSettings = async (payload) => {
@@ -1157,6 +1176,7 @@ export const SimulatorProvider = ({ children }) => {
         patchCompanyDetailsLocal,
         saveCompanyProfile,
         uploadCompanyLogo,
+        uploadCompanySignature,
         saveGstComplianceSettings,
         generateEinvoice,
         cancelEinvoice,
