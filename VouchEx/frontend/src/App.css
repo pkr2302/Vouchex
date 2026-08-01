@@ -4633,7 +4633,48 @@ html.nav-scroll-lock .main-content {
 }
 
 .billing-sheet--wonder .invoice-items-table {
-  min-width: 720px;
+  min-width: 920px;
+  table-layout: fixed;
+}
+
+.billing-sheet--wonder .invoice-items-table th:nth-child(1),
+.billing-sheet--wonder .invoice-items-table td:nth-child(1) {
+  width: 11%;
+}
+
+.billing-sheet--wonder .invoice-items-table th.invoice-col-desc,
+.billing-sheet--wonder .invoice-items-table td.invoice-col-desc {
+  width: 36%;
+  min-width: 260px;
+}
+
+.billing-sheet--wonder .invoice-items-table th:nth-child(3),
+.billing-sheet--wonder .invoice-items-table td:nth-child(3) {
+  width: 8%;
+}
+
+.billing-sheet--wonder .invoice-items-table th:nth-child(4),
+.billing-sheet--wonder .invoice-items-table td:nth-child(4),
+.billing-sheet--wonder .invoice-items-table th:nth-child(5),
+.billing-sheet--wonder .invoice-items-table td:nth-child(5),
+.billing-sheet--wonder .invoice-items-table th:nth-child(6),
+.billing-sheet--wonder .invoice-items-table td:nth-child(6) {
+  width: 7%;
+}
+
+.billing-sheet--wonder .invoice-items-table th:nth-child(7),
+.billing-sheet--wonder .invoice-items-table td:nth-child(7) {
+  width: 9%;
+}
+
+.billing-sheet--wonder .invoice-items-table th:nth-child(8),
+.billing-sheet--wonder .invoice-items-table td:nth-child(8) {
+  width: 9%;
+}
+
+.billing-sheet--wonder .invoice-items-table th:nth-child(9),
+.billing-sheet--wonder .invoice-items-table td:nth-child(9) {
+  width: 36px;
 }
 
 .billing-sheet--wonder .invoice-items-table thead th {
@@ -4654,12 +4695,22 @@ html.nav-scroll-lock .main-content {
   padding: 3px 5px;
   font-size: 12px;
   min-height: 28px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .billing-sheet--wonder .line-item-desc-dense {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.75fr);
-  gap: 4px;
+  grid-template-columns: 1fr;
+  gap: 3px;
+}
+
+.billing-sheet--wonder .line-item-desc-input,
+.line-item-desc-input {
+  resize: vertical;
+  min-height: 48px;
+  line-height: 1.35;
+  field-sizing: content;
 }
 
 .billing-sheet--wonder .line-item-tax-preview {

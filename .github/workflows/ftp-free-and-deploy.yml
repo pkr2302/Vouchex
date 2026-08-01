@@ -138,8 +138,15 @@ jobs:
 
           print("FREED_BYTES_EST", total)
 
-          # Upload critical frontend
+          # Upload critical frontend (auto-detect hashed assets from build)
           local_public = Path("VouchEx/laravel-api/public")
+          assets_dir = local_public / "assets"
+          js = sorted(assets_dir.glob("index-*.js"), key=lambda p: p.stat().st_mtime, reverse=True)
+          css = sorted(assets_dir.glob("index-*.css"), key=lambda p: p.stat().st_mtime, reverse=True)
+          if not js or not css:
+              print("MISSING built assets in", assets_dir)
+              sys.exit(1)
+
           try:
               cwd(f"{base}/public")
               try:
@@ -150,13 +157,23 @@ jobs:
               print("public missing", e)
               sys.exit(1)
 
-          for local_rel, remote_name in [
-              ("index.html", "index.html"),
-              ("assets/index-DPA8upms.js", "index-DPA8upms.js"),
-              ("assets/index-CRkI_dEu.css", "index-CRkI_dEu.css"),
-          ]:
-              local = local_public / local_rel
-              remote_dir = f"{base}/public" if remote_name == "index.html" else f"{base}/public/assets"
+          # Clear remote assets first so quota can accept new files
+          wipe_tree(f"{base}/public/assets", 0, 2)
+          try:
+              cwd(f"{base}/public")
+              try:
+                  ftp.mkd("assets")
+              except error_perm:
+                  pass
+          except error_perm:
+              pass
+
+          uploads = [
+              (local_public / "index.html", f"{base}/public", "index.html"),
+              (js[0], f"{base}/public/assets", js[0].name),
+              (css[0], f"{base}/public/assets", css[0].name),
+          ]
+          for local, remote_dir, remote_name in uploads:
               cwd(remote_dir)
               print(f"STOR {local} -> {remote_dir}/{remote_name} size={local.stat().st_size}")
               with local.open("rb") as fh:

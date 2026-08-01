@@ -2017,7 +2017,7 @@ function SalesInvoicesSubTab() {
                   <thead>
                     <tr>
                       <th>Product</th>
-                      <th>Description</th>
+                      <th className="invoice-col-desc">Description</th>
                       <th>HSN/SAC</th>
                       <th>Qty</th>
                       <th>Rate ({curSym})</th>

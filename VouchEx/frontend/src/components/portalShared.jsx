@@ -639,12 +639,13 @@ export function LineItemTaxRow({ line, index, onChange, onRemove, canRemove, pla
           )}
         </div>
       </td>
-      <td className="line-item-cell" data-label="Description">
+      <td className="line-item-cell invoice-col-desc" data-label="Description">
         {dense ? (
           <div className="line-item-desc-dense">
-            <input
-              className="form-input"
+            <textarea
+              className="form-input line-item-desc-input"
               placeholder="Description *"
+              rows={2}
               value={line.description}
               onChange={(e) => handle('description', e.target.value)}
             />
@@ -658,9 +659,10 @@ export function LineItemTaxRow({ line, index, onChange, onRemove, canRemove, pla
           </div>
         ) : (
           <>
-            <input
-              className="form-input"
+            <textarea
+              className="form-input line-item-desc-input"
               placeholder="Description *"
+              rows={2}
               value={line.description}
               onChange={(e) => handle('description', e.target.value)}
             />
