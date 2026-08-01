@@ -2497,35 +2497,7 @@ function SalesInvoicesSubTab() {
               </tbody>
             </table>
 
-            <div className="pdf-invoice-footer-grid">
-              <div className="pdf-payment-box">
-                <h4 className="pdf-payment-box-title">Payment Details</h4>
-                <PdfOptionalLine
-                  label="A/C Holder:"
-                  value={companyDetails.bank_account_holder}
-                  style={{ margin: '3px 0' }}
-                />
-                <PdfOptionalLine
-                  label="Account No.:"
-                  value={companyDetails.bank_account}
-                  style={{ margin: '3px 0' }}
-                />
-                <PdfOptionalLine
-                  label="Bank Name:"
-                  value={companyDetails.bank_name}
-                  style={{ margin: '3px 0' }}
-                />
-                <PdfOptionalLine
-                  label="IFSC:"
-                  value={companyDetails.bank_ifsc}
-                  style={{ margin: '3px 0' }}
-                />
-                <PdfOptionalLine
-                  label="Branch:"
-                  value={companyDetails.bank_branch}
-                  style={{ margin: '3px 0' }}
-                />
-              </div>
+            <div className="pdf-invoice-totals-row">
               <div className="pdf-totals-box">
                 <div className="pdf-totals-row">
                   <span>Subtotal</span>
@@ -2574,25 +2546,55 @@ function SalesInvoicesSubTab() {
               </span>
             </div>
 
-            <div className="pdf-signatory-wrap">
-              <div className="pdf-signatory-block">
-                {companyDetails.signature_image ? (
-                  <img
-                    src={companyDetails.signature_image}
-                    alt=""
-                    className="pdf-signatory-image"
-                  />
-                ) : (
-                  <div className="pdf-signatory-image-spacer" aria-hidden />
-                )}
-                <div className="pdf-signatory-line" />
-                <p className="pdf-signatory-name">
-                  {companyDetails.signatory_name?.trim() || 'Authorised Signatory'}
-                </p>
-                <p className="pdf-signatory-label">Authorised Signatory</p>
-                {!isBlankFieldValue(companyDetails.name) && (
-                  <p className="pdf-signatory-company">{companyDetails.name}</p>
-                )}
+            <div className="pdf-invoice-footer-grid">
+              <div className="pdf-payment-box">
+                <h4 className="pdf-payment-box-title">Payment Details</h4>
+                <PdfOptionalLine
+                  label="A/C Holder:"
+                  value={companyDetails.bank_account_holder}
+                  style={{ margin: '3px 0' }}
+                />
+                <PdfOptionalLine
+                  label="Account No.:"
+                  value={companyDetails.bank_account}
+                  style={{ margin: '3px 0' }}
+                />
+                <PdfOptionalLine
+                  label="Bank Name:"
+                  value={companyDetails.bank_name}
+                  style={{ margin: '3px 0' }}
+                />
+                <PdfOptionalLine
+                  label="IFSC:"
+                  value={companyDetails.bank_ifsc}
+                  style={{ margin: '3px 0' }}
+                />
+                <PdfOptionalLine
+                  label="Branch:"
+                  value={companyDetails.bank_branch}
+                  style={{ margin: '3px 0' }}
+                />
+              </div>
+              <div className="pdf-signatory-wrap">
+                <div className="pdf-signatory-block">
+                  {companyDetails.signature_image ? (
+                    <img
+                      src={companyDetails.signature_image}
+                      alt=""
+                      className="pdf-signatory-image"
+                    />
+                  ) : (
+                    <div className="pdf-signatory-image-spacer" aria-hidden />
+                  )}
+                  <div className="pdf-signatory-line" />
+                  <p className="pdf-signatory-name">
+                    {companyDetails.signatory_name?.trim() || 'Authorised Signatory'}
+                  </p>
+                  <p className="pdf-signatory-label">Authorised Signatory</p>
+                  {!isBlankFieldValue(companyDetails.name) && (
+                    <p className="pdf-signatory-company">{companyDetails.name}</p>
+                  )}
+                </div>
               </div>
             </div>
 

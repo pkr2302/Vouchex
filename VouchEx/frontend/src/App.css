@@ -6415,12 +6415,22 @@ html.nav-scroll-lock .main-content {
   background: #fff !important;
 }
 
+.pdf-invoice-totals-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.pdf-invoice-totals-row .pdf-totals-box {
+  width: min(100%, 280px);
+}
+
 .pdf-invoice-footer-grid {
   display: grid;
   grid-template-columns: 1.15fr 0.85fr;
   gap: 16px;
-  margin-top: 16px;
-  align-items: stretch;
+  margin-top: 12px;
+  align-items: end;
 }
 
 .pdf-payment-box {
@@ -6539,7 +6549,7 @@ html.nav-scroll-lock .main-content {
 }
 
 .pdf-amount-words {
-  margin-top: 14px;
+  margin-top: 12px;
   padding: 8px 10px;
   border: 1px solid #d8dee8;
   background: #f8fafc;
@@ -6572,12 +6582,15 @@ html.nav-scroll-lock .main-content {
 .pdf-signatory-wrap {
   display: flex;
   justify-content: flex-end;
-  margin-top: 22px;
+  align-items: flex-end;
+  margin-top: 0;
+  min-height: 100%;
   page-break-inside: avoid;
 }
 
 .pdf-signatory-block {
-  width: 220px;
+  width: 100%;
+  max-width: 240px;
   text-align: center;
   color: #1a1f2e;
 }
