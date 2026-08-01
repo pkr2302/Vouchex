@@ -6538,6 +6538,27 @@ html.nav-scroll-lock .main-content {
   color: #111;
 }
 
+.pdf-amount-words {
+  margin-top: 14px;
+  padding: 8px 10px;
+  border: 1px solid #d8dee8;
+  background: #f8fafc;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: #1a1f2e;
+  page-break-inside: avoid;
+}
+
+.pdf-amount-words-label {
+  font-weight: 700;
+  color: #334155;
+}
+
+.pdf-amount-words-text {
+  font-weight: 600;
+  font-style: italic;
+}
+
 .pdf-invoice-thanks {
   margin: 14px 0 0;
   padding-top: 10px;

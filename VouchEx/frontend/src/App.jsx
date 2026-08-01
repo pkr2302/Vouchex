@@ -58,6 +58,7 @@ import {
 } from './utils/gstUtils';
 import { INVENTORY_UNIT_BASE_OPTIONS } from './data/inventoryUnits';
 import { formatINR, sumField, toAmount, sameId, formatDateDDMMYYYY, nextDocumentNumber, sortRegistryNewestFirst, dateOnly, parseDateOnlyLocal, dueDateFromPaymentTerms, isBlankFieldValue, formatPartyAddressForDisplay, buildPartyAddressLine, isValidPaymentTerms, receiptSettledInvoiceLabel, paymentSettledExpenseLabel, paymentVoucherTypeLabel, formatPdfINR, formatDocumentMoney, formatPdfDocument, invoiceLineAmounts, buildForexConversionQueue } from './utils/formatMoney';
+import { amountInWords } from './utils/amountInWords';
 import { formatCurrencyLabel, getCurrencySymbol } from './utils/currencyData';
 import { computeBankCashBalances } from './utils/ledgerBalances';
 import { showApiError } from './utils/apiErrors';
@@ -2564,6 +2565,13 @@ function SalesInvoicesSubTab() {
                   </>
                 )}
               </div>
+            </div>
+
+            <div className="pdf-amount-words">
+              <span className="pdf-amount-words-label">Invoice Value (in words):</span>{' '}
+              <span className="pdf-amount-words-text">
+                {amountInWords(inv.total_amount, pdfCur)}
+              </span>
             </div>
 
             <div className="pdf-signatory-wrap">
