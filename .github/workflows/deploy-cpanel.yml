@@ -15,7 +15,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Free disk + upload critical frontend files
+      - name: Free disk and upload built frontend
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
@@ -33,80 +33,47 @@ jobs:
           base = "/" + (os.environ.get("FTP_SERVER_DIR") or "/").strip("/")
 
           ftp = FTP()
-          ftp.connect(host, 21, timeout=120)
+          ftp.connect(host, 21, timeout=180)
           ftp.login(user, password)
           ftp.set_pasv(True)
-          print("pwd", ftp.pwd(), "base", base)
 
           def cwd(path):
               ftp.cwd(path)
 
-          def nlst():
+          def list_names(path):
               try:
+                  cwd(path)
                   return [n for n in ftp.nlst() if n not in (".", "..")]
               except error_perm:
                   return []
 
-          def wipe_dir(path, keep=(".gitignore",)):
-              try:
-                  cwd(path)
-              except error_perm as e:
-                  print("skip", path, e)
-                  return 0
-              names = nlst()
-              print(f"wipe {ftp.pwd()} names={names}")
-              n = 0
+          def wipe_files(path):
+              names = list_names(path)
               for name in names:
                   leaf = name.rstrip("/").split("/")[-1]
-                  if leaf in keep:
-                      continue
                   try:
+                      cwd(path)
                       ftp.delete(leaf)
-                      print("deleted file", leaf)
-                      n += 1
-                      continue
-                  except error_perm:
-                      pass
-                  try:
-                      ftp.rmd(leaf)
-                      print("deleted dir", leaf)
-                      n += 1
+                      print("DEL", path, leaf)
                   except error_perm as e:
-                      print("could not remove", leaf, e)
-              return n
+                      print("skip", leaf, e)
 
-          removed = 0
-          removed += wipe_dir(f"{base}/public/assets", keep=())
-          removed += wipe_dir(f"{base}/storage/logs", keep=(".gitignore",))
-          removed += wipe_dir(f"{base}/storage/framework/sessions", keep=(".gitignore",))
-          removed += wipe_dir(f"{base}/storage/framework/views", keep=(".gitignore",))
-          removed += wipe_dir(f"{base}/bootstrap/cache", keep=(".gitignore", "packages.php", "services.php"))
+          for p in (
+              f"{base}/public/assets",
+              f"{base}/storage/logs",
+              f"{base}/storage/framework/sessions",
+              f"{base}/storage/framework/views",
+          ):
+              wipe_files(p)
 
-          # Root junk
-          for rel in (base, f"{base}/public"):
-              try:
-                  cwd(rel)
-              except error_perm:
-                  continue
-              for leaf in ("error_log", "app.zip", "debug.log"):
-                  try:
-                      ftp.delete(leaf)
-                      print("deleted", rel, leaf)
-                      removed += 1
-                  except error_perm:
-                      pass
-
-          print("removed", removed)
-
-          # Upload only what we need for the invoice layout (smallest critical set)
           local_public = Path("VouchEx/laravel-api/public")
-          uploads = [
-              ("index.html", f"{base}/public/index.html"),
-              ("assets/index-DPA8upms.js", f"{base}/public/assets/index-DPA8upms.js"),
-              ("assets/index-CRkI_dEu.css", f"{base}/public/assets/index-CRkI_dEu.css"),
-          ]
+          assets_dir = local_public / "assets"
+          js = sorted(assets_dir.glob("index-*.js"), key=lambda p: p.stat().st_mtime, reverse=True)
+          css = sorted(assets_dir.glob("index-*.css"), key=lambda p: p.stat().st_mtime, reverse=True)
+          if not js or not css:
+              print("MISSING assets")
+              sys.exit(1)
 
-          # Ensure assets dir exists
           try:
               cwd(f"{base}/public")
               try:
@@ -114,29 +81,35 @@ jobs:
               except error_perm:
                   pass
           except error_perm as e:
-              print("cannot enter public", e)
+              print(e)
               sys.exit(1)
 
-          for local_rel, remote_path in uploads:
-              local = local_public / local_rel
-              if not local.exists():
-                  print("MISSING local", local)
-                  sys.exit(1)
-              remote_dir = remote_path.rsplit("/", 1)[0]
-              remote_name = remote_path.rsplit("/", 1)[1]
+          wipe_files(f"{base}/public/assets")
+          try:
+              cwd(f"{base}/public")
+              try:
+                  ftp.mkd("assets")
+              except error_perm:
+                  pass
+          except error_perm:
+              pass
+
+          for local, remote_dir, remote_name in [
+              (local_public / "index.html", f"{base}/public", "index.html"),
+              (js[0], f"{base}/public/assets", js[0].name),
+              (css[0], f"{base}/public/assets", css[0].name),
+          ]:
               cwd(remote_dir)
-              size = local.stat().st_size
-              print(f"upload {local} ({size} bytes) -> {remote_dir}/{remote_name}")
+              print("STOR", remote_name, local.stat().st_size)
               with local.open("rb") as fh:
-                  ftp.storbinary(f"STOR {remote_name}", fh, blocksize=1024 * 64)
-              print("ok", remote_name)
+                  ftp.storbinary(f"STOR {remote_name}", fh, blocksize=64 * 1024)
+              print("OK", remote_name)
 
           ftp.quit()
-          print("CRITICAL FRONTEND UPLOAD COMPLETE")
+          print("FRONTEND_OK")
           PY
 
-      - name: Sync remaining laravel-api files (best effort)
-        continue-on-error: true
+      - name: Upload laravel-api to cPanel (FTP)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}

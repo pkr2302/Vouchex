@@ -180,6 +180,27 @@ jobs:
                   ftp.storbinary(f"STOR {remote_name}", fh, blocksize=64 * 1024)
               print("OK", remote_name)
 
+          # Backend files required for row-number option
+          api_root = Path("VouchEx/laravel-api")
+          php_uploads = [
+              (api_root / "app/Models/Invoice.php", f"{base}/app/Models", "Invoice.php"),
+              (api_root / "app/Http/Controllers/Api/PortalMutationController.php", f"{base}/app/Http/Controllers/Api", "PortalMutationController.php"),
+              (api_root / "database/migrations/2026_08_01_000044_add_show_row_numbers_on_pdf_to_invoices.php", f"{base}/database/migrations", "2026_08_01_000044_add_show_row_numbers_on_pdf_to_invoices.php"),
+          ]
+          for local, remote_dir, remote_name in php_uploads:
+              if not local.exists():
+                  print("MISSING", local)
+                  continue
+              try:
+                  cwd(remote_dir)
+              except error_perm as e:
+                  print("cwd fail", remote_dir, e)
+                  continue
+              print(f"STOR {local} -> {remote_dir}/{remote_name}")
+              with local.open("rb") as fh:
+                  ftp.storbinary(f"STOR {remote_name}", fh, blocksize=64 * 1024)
+              print("OK", remote_name)
+
           ftp.quit()
           print("UPLOAD_OK")
           PY
