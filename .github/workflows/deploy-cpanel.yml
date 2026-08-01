@@ -15,6 +15,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Free cPanel disk space (old assets + logs)
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
+        run: |
+          set -uo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lftp
+          REMOTE_DIR="${FTP_SERVER_DIR%/}"
+          lftp -c "
+            set ftp:ssl-allow no;
+            set net:timeout 90;
+            set net:max-retries 3;
+            set cmd:fail-exit false;
+            open -u ${FTP_USERNAME},${FTP_PASSWORD} ftp://${FTP_SERVER};
+            cd ${REMOTE_DIR}/public/assets;
+            glob rm -f index-*.js;
+            glob rm -f index-*.css;
+            cd ${REMOTE_DIR}/storage/logs;
+            glob rm -f *.log;
+            glob rm -f laravel-*.log;
+            cd ${REMOTE_DIR};
+            rm -f error_log;
+            rm -f public/error_log;
+            rm -f app.zip;
+            bye
+          "
+          echo "Disk cleanup finished (best-effort)."
+
       - name: Upload laravel-api to cPanel (FTP)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -25,7 +56,7 @@ jobs:
           local-dir: ./VouchEx/laravel-api/
           server-dir: ${{ secrets.FTP_SERVER_DIR }}
           dangerous-clean-slate: false
-          timeout: 120000
+          timeout: 180000
           exclude: |
             **/.env
             **/.git*
