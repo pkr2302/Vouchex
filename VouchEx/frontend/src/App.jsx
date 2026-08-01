@@ -1793,10 +1793,11 @@ function SalesInvoicesSubTab() {
             <div className="billing-sheet__heading">
               <span className="billing-sheet__mark" aria-hidden="true" />
               <div>
-                <p className="billing-sheet__kicker">Sales ledger</p>
+                <p className="billing-sheet__kicker">Sales · Invoice</p>
                 <h3 className="billing-sheet__title">
-                  {editingInvoiceId ? 'Edit invoice' : 'New sales invoice'}
+                  {editingInvoiceId ? 'Edit sales invoice' : 'Create sales invoice'}
                 </h3>
+                <p className="billing-sheet__subtitle">Enter the customer, supply and item details below.</p>
               </div>
               <span className="billing-sheet__doc-badge" title="Invoice number">
                 {invoiceNumberInput || '—'}
@@ -1834,7 +1835,7 @@ function SalesInvoicesSubTab() {
                 </button>
               )}
               <button type="button" className="btn-secondary billing-sheet__back" onClick={resetInvoiceForm}>
-                ← Registry
+                ← Back to invoices
               </button>
             </div>
           </div>
@@ -1849,6 +1850,13 @@ function SalesInvoicesSubTab() {
           {scanError && <span className="billing-sheet__scan-error">{scanError}</span>}
 
           <div className="billing-sheet__ledger-head">
+            <div className="billing-sheet__group-heading">
+              <span className="billing-sheet__group-step">1</span>
+              <div>
+                <strong>Invoice details</strong>
+                <small>Basic document information and customer</small>
+              </div>
+            </div>
             <div className="billing-sheet__row billing-sheet__row--id">
               <div className="form-group">
                 <label>Category</label>
@@ -1909,6 +1917,14 @@ function SalesInvoicesSubTab() {
               </div>
             </div>
 
+            <div className="billing-sheet__group-divider" />
+            <div className="billing-sheet__group-heading">
+              <span className="billing-sheet__group-step">2</span>
+              <div>
+                <strong>Tax and delivery</strong>
+                <small>Supply, tax registration and addresses</small>
+              </div>
+            </div>
             <div className="billing-sheet__row billing-sheet__row--meta">
               <div className="billing-sheet__pos">
                 <PlaceOfSupplyCountrySelect
@@ -1934,26 +1950,6 @@ function SalesInvoicesSubTab() {
                   onChange={(e) => setClientTaxId(e.target.value)}
                 />
               </div>
-              <div className="form-group billing-sheet__check-wrap">
-                <label className="billing-sheet__check">
-                  <input
-                    type="checkbox"
-                    checked={printPlaceOfSupplyOnPdf}
-                    onChange={(e) => setPrintPlaceOfSupplyOnPdf(e.target.checked)}
-                  />
-                  Print POS
-                </label>
-              </div>
-              <div className="form-group billing-sheet__check-wrap">
-                <label className="billing-sheet__check">
-                  <input
-                    type="checkbox"
-                    checked={showRowNumbersOnPdf}
-                    onChange={(e) => setShowRowNumbersOnPdf(e.target.checked)}
-                  />
-                  Row no.
-                </label>
-              </div>
               <div className="form-group billing-sheet__addr-field">
                 <label>Billing</label>
                 <input
@@ -1974,6 +1970,25 @@ function SalesInvoicesSubTab() {
                   placeholder="Street, city, state, PIN"
                 />
               </div>
+            </div>
+            <div className="billing-sheet__options-row" aria-label="Print options">
+              <span>PDF options</span>
+              <label className="billing-sheet__check">
+                <input
+                  type="checkbox"
+                  checked={printPlaceOfSupplyOnPdf}
+                  onChange={(e) => setPrintPlaceOfSupplyOnPdf(e.target.checked)}
+                />
+                Print place of supply
+              </label>
+              <label className="billing-sheet__check">
+                <input
+                  type="checkbox"
+                  checked={showRowNumbersOnPdf}
+                  onChange={(e) => setShowRowNumbersOnPdf(e.target.checked)}
+                />
+                Show row numbers
+              </label>
             </div>
 
             {currency !== 'INR' && (
@@ -2018,11 +2033,16 @@ function SalesInvoicesSubTab() {
           <div className="billing-sheet__workspace">
             <div className="billing-sheet__items-pane">
               <div className="billing-sheet__items-head">
-                <h4 className="billing-sheet__section">Line items</h4>
+                <div>
+                  <h4 className="billing-sheet__section">3 · Line items</h4>
+                  <p className="billing-sheet__section-note">
+                    {lineItems.length} {lineItems.length === 1 ? 'item' : 'items'} in this invoice
+                  </p>
+                </div>
                 <div className="billing-sheet__items-tools">
-                  <button type="button" className="btn-secondary-sm" onClick={() => setShowInlineInventory(true)}>+ Item master</button>
+                  <button type="button" className="btn-secondary-sm" onClick={() => setShowInlineInventory(true)}>Item master</button>
                   <button type="button" className="btn-secondary-sm billing-sheet__add-inline" onClick={addLineItem}>
-                    <Plus size={13} /> Add row
+                    <Plus size={13} /> Add item
                   </button>
                 </div>
               </div>
@@ -2065,7 +2085,13 @@ function SalesInvoicesSubTab() {
             </div>
 
             <aside className="billing-sheet__settle">
-              <p className="billing-sheet__settle-label">Settlement</p>
+              <div className="billing-sheet__summary-heading">
+                <span className="billing-sheet__group-step">4</span>
+                <div>
+                  <p className="billing-sheet__settle-label">Invoice summary</p>
+                  <small>Review before saving</small>
+                </div>
+              </div>
               <div className="billing-sheet__settle-total">
                 <span>Total due</span>
                 <strong style={{ color: 'var(--accent-teal)' }}>{docMoney(totalAmount)}</strong>
@@ -2122,7 +2148,7 @@ function SalesInvoicesSubTab() {
                   disabled={invoiceSaving}
                   onClick={handleSaveInvoice}
                 >
-                  {editingInvoiceId ? 'Update' : 'Generate'}
+                  {editingInvoiceId ? 'Update invoice' : 'Save invoice'}
                 </button>
               </div>
             </aside>
