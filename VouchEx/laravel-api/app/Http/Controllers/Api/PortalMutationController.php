@@ -1192,6 +1192,11 @@ class PortalMutationController extends Controller
 
     public function uploadCompanyLogo(Request $request): JsonResponse
     {
+        // Live route-cache may lack /settings/company/signature; accept signature on this known route.
+        if ($request->hasFile('signature')) {
+            return $this->storeCompanySignatureUpload($request);
+        }
+
         if (!$request->user()->isAdmin()) {
             return response()->json(['message' => 'Only administrators can update the company logo.'], 403);
         }
@@ -1244,6 +1249,12 @@ class PortalMutationController extends Controller
     }
 
     public function uploadCompanySignature(Request $request): JsonResponse
+    {
+        return $this->storeCompanySignatureUpload($request);
+    }
+
+    /** Store authorised signature image under public disk and persist path on company settings. */
+    private function storeCompanySignatureUpload(Request $request): JsonResponse
     {
         if (!$request->user()->isAdmin()) {
             return response()->json(['message' => 'Only administrators can update the authorised signature.'], 403);

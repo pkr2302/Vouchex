@@ -164,10 +164,20 @@ export const portalApi = {
     return apiUpload('/settings/company/logo', form);
   },
 
-  uploadCompanySignature: (file) => {
+  uploadCompanySignature: async (file) => {
     const form = new FormData();
     form.append('signature', file, file.name || 'company-signature.png');
-    return apiUpload('/settings/company/signature', form);
+    try {
+      return await apiUpload('/settings/company/signature', form);
+    } catch (err) {
+      // Stale live route-cache may 404 the dedicated path; logo route already accepts signature.
+      if (err?.status === 404) {
+        const fallback = new FormData();
+        fallback.append('signature', file, file.name || 'company-signature.png');
+        return apiUpload('/settings/company/logo', fallback);
+      }
+      throw err;
+    }
   },
 
   listCompanies: () => apiRequest('/companies'),
