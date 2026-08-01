@@ -22,29 +22,95 @@ jobs:
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
         run: |
-          set -uo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq lftp
-          REMOTE_DIR="${FTP_SERVER_DIR%/}"
-          lftp -c "
-            set ftp:ssl-allow no;
-            set net:timeout 90;
-            set net:max-retries 3;
-            set cmd:fail-exit false;
-            open -u ${FTP_USERNAME},${FTP_PASSWORD} ftp://${FTP_SERVER};
-            cd ${REMOTE_DIR}/public/assets;
-            glob rm -f index-*.js;
-            glob rm -f index-*.css;
-            cd ${REMOTE_DIR}/storage/logs;
-            glob rm -f *.log;
-            glob rm -f laravel-*.log;
-            cd ${REMOTE_DIR};
-            rm -f error_log;
-            rm -f public/error_log;
-            rm -f app.zip;
-            bye
-          "
-          echo "Disk cleanup finished (best-effort)."
+          python3 <<'PY'
+          import os, sys
+          from ftplib import FTP, error_perm
+
+          host = os.environ["FTP_SERVER"].strip()
+          user = os.environ["FTP_USERNAME"].strip()
+          password = os.environ["FTP_PASSWORD"]
+          base = os.environ.get("FTP_SERVER_DIR", "/").strip() or "/"
+          base = "/" + base.strip("/")
+
+          ftp = FTP()
+          ftp.connect(host, 21, timeout=90)
+          ftp.login(user, password)
+          ftp.set_pasv(True)
+          print(f"Connected. cwd start={ftp.pwd()} base={base}")
+
+          def safe_cwd(path):
+              try:
+                  ftp.cwd(path)
+                  return True
+              except error_perm as e:
+                  print(f"cwd fail {path}: {e}")
+                  return False
+
+          def list_names():
+              try:
+                  return ftp.nlst()
+              except error_perm:
+                  return []
+
+          def delete_matching(patterns_suffix=(), prefixes=(), exact=()):
+              names = list_names()
+              print(f"in {ftp.pwd()}: {len(names)} entries")
+              removed = 0
+              for name in names:
+                  base_name = name.split("/")[-1]
+                  hit = base_name in exact
+                  hit = hit or any(base_name.endswith(s) for s in patterns_suffix)
+                  hit = hit or any(base_name.startswith(p) for p in prefixes)
+                  if not hit:
+                      continue
+                  try:
+                      ftp.delete(base_name)
+                      print(f"deleted {ftp.pwd()}/{base_name}")
+                      removed += 1
+                  except error_perm as e:
+                      print(f"delete fail {base_name}: {e}")
+              return removed
+
+          total = 0
+          # Frontend bundles (largest recurring deploy leftovers)
+          for rel in (f"{base}/public/assets", f"{base}/assets", "/public_html/public/assets", "/public_html/assets"):
+              if safe_cwd(rel):
+                  total += delete_matching(prefixes=("index-",), patterns_suffix=(".js", ".css", ".map"))
+
+          # Laravel / PHP logs
+          for rel in (f"{base}/storage/logs", f"{base}/logs", "/public_html/storage/logs"):
+              if safe_cwd(rel):
+                  total += delete_matching(patterns_suffix=(".log",), exact=("laravel.log",))
+
+          # Root error logs / zip leftovers
+          for rel in (base, f"{base}/public", "/public_html", "/public_html/public"):
+              if safe_cwd(rel):
+                  total += delete_matching(exact=("error_log", "app.zip", "debug.log"))
+
+          # Session / cache files (safe to wipe)
+          for rel in (
+              f"{base}/storage/framework/sessions",
+              f"{base}/storage/framework/cache/data",
+              f"{base}/storage/framework/views",
+          ):
+              if not safe_cwd(rel):
+                  continue
+              for name in list_names():
+                  base_name = name.split("/")[-1]
+                  if base_name in (".", "..", ".gitignore"):
+                      continue
+                  try:
+                      ftp.delete(base_name)
+                      total += 1
+                      print(f"deleted {ftp.pwd()}/{base_name}")
+                  except error_perm:
+                      pass
+
+          ftp.quit()
+          print(f"Cleanup complete. removed≈{total} files")
+          if total == 0:
+              print("WARNING: nothing deleted — check FTP_SERVER_DIR path", file=sys.stderr)
+          PY
 
       - name: Upload laravel-api to cPanel (FTP)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
