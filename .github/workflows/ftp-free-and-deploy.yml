@@ -1,0 +1,168 @@
+name: FTP Free Space And Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  free-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Delete large recoverable files then upload frontend
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
+        run: |
+          python3 <<'PY'
+          import os, sys
+          from ftplib import FTP, error_perm
+          from pathlib import Path
+
+          host = os.environ["FTP_SERVER"].strip()
+          user = os.environ["FTP_USERNAME"].strip()
+          password = os.environ["FTP_PASSWORD"]
+          base = "/" + (os.environ.get("FTP_SERVER_DIR") or "/").strip("/")
+
+          ftp = FTP()
+          ftp.connect(host, 21, timeout=180)
+          ftp.login(user, password)
+          ftp.set_pasv(True)
+          print("pwd", ftp.pwd(), "base", base)
+
+          def cwd(path):
+              ftp.cwd(path)
+              return ftp.pwd()
+
+          def list_entries(path):
+              try:
+                  cwd(path)
+              except error_perm as e:
+                  print("no dir", path, e)
+                  return []
+              rows = []
+              try:
+                  ftp.retrlines("LIST", rows.append)
+              except error_perm as e:
+                  print("list fail", path, e)
+                  return []
+              out = []
+              for line in rows:
+                  parts = line.split(maxsplit=8)
+                  if len(parts) < 9:
+                      continue
+                  name = parts[8]
+                  if name in (".", ".."):
+                      continue
+                  out.append((line.startswith("d"), name, int(parts[4]) if parts[4].isdigit() else 0, line))
+              return out
+
+          def delete_file(path_dir, name):
+              cwd(path_dir)
+              ftp.delete(name)
+              print(f"DEL {path_dir}/{name}")
+
+          def wipe_tree(path, depth=0, max_depth=6):
+              """Recursively delete files under path. Returns bytes freed estimate."""
+              freed = 0
+              entries = list_entries(path)
+              print(f"DIR {path} count={len(entries)}")
+              for is_dir, name, size, _ in entries:
+                  full = path.rstrip("/") + "/" + name
+                  if is_dir:
+                      if depth >= max_depth:
+                          continue
+                      freed += wipe_tree(full, depth + 1, max_depth)
+                      try:
+                          cwd(path)
+                          ftp.rmd(name)
+                          print(f"RMDIR {full}")
+                      except error_perm as e:
+                          print(f"rmdir fail {full}: {e}")
+                  else:
+                      try:
+                          delete_file(path, name)
+                          freed += size
+                      except error_perm as e:
+                          print(f"del fail {full}: {e}")
+              return freed
+
+          # Show top of account + parent
+          for p in (base, "/", base.rsplit("/", 1)[0] or "/"):
+              ents = list_entries(p)
+              print(f"\nLIST {p}")
+              for is_dir, name, size, line in ents[:50]:
+                  print(line)
+
+          targets = [
+              f"{base}/storage/logs",
+              f"{base}/storage/framework/sessions",
+              f"{base}/storage/framework/views",
+              f"{base}/storage/framework/cache",
+              f"{base}/storage/app/backups",
+              f"{base}/storage/app/private",
+              f"{base}/storage/app/public/tmp",
+              f"{base}/bootstrap/cache",
+              f"{base}/public/assets",
+          ]
+          # Also common cPanel backup / mail leftovers reachable from app parent
+          parent = base.rsplit("/", 1)[0] or "/"
+          targets += [
+              f"{parent}/tmp",
+              f"{parent}/logs",
+              f"{parent}/mail",
+              f"{parent}/softaculous_backups",
+              f"{parent}/backup",
+              f"{parent}/backups",
+          ]
+
+          total = 0
+          for t in targets:
+              total += wipe_tree(t, 0, 8 if "backup" in t or t.endswith("/mail") or t.endswith("/logs") else 5)
+
+          # Delete obvious junk files at base/public
+          for d in (base, f"{base}/public", parent):
+              for is_dir, name, size, _ in list_entries(d):
+                  if is_dir:
+                      continue
+                  low = name.lower()
+                  if low in ("error_log", "app.zip", "debug.log") or low.endswith(".zip") or low.endswith(".sql") or low.endswith(".tar.gz") or low.endswith(".gz"):
+                      try:
+                          delete_file(d, name)
+                          total += size
+                      except error_perm as e:
+                          print("junk fail", name, e)
+
+          print("FREED_BYTES_EST", total)
+
+          # Upload critical frontend
+          local_public = Path("VouchEx/laravel-api/public")
+          try:
+              cwd(f"{base}/public")
+              try:
+                  ftp.mkd("assets")
+              except error_perm:
+                  pass
+          except error_perm as e:
+              print("public missing", e)
+              sys.exit(1)
+
+          for local_rel, remote_name in [
+              ("index.html", "index.html"),
+              ("assets/index-DPA8upms.js", "index-DPA8upms.js"),
+              ("assets/index-CRkI_dEu.css", "index-CRkI_dEu.css"),
+          ]:
+              local = local_public / local_rel
+              remote_dir = f"{base}/public" if remote_name == "index.html" else f"{base}/public/assets"
+              cwd(remote_dir)
+              print(f"STOR {local} -> {remote_dir}/{remote_name} size={local.stat().st_size}")
+              with local.open("rb") as fh:
+                  ftp.storbinary(f"STOR {remote_name}", fh, blocksize=64 * 1024)
+              print("OK", remote_name)
+
+          ftp.quit()
+          print("UPLOAD_OK")
+          PY
