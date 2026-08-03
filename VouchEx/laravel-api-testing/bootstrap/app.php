@@ -16,10 +16,23 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withSchedule(function (Schedule $schedule) {
         $schedule->command('calendar:send-reminders')->everyMinute();
+
+        // Catch-up scheduler: do NOT use dailyAt('13:00') alone.
+        // On shared hosting, missing that single minute skips the backup for the whole day.
+        // After the configured time, retry every 5 minutes until PortalSetting marks today as sent.
         $schedule->command('backups:send-daily')
-            ->dailyAt(config('vouchex.backup_daily_at', '13:00'))
+            ->everyFiveMinutes()
             ->timezone(config('vouchex.backup_timezone', 'Asia/Kolkata'))
-            ->withoutOverlapping(30);
+            ->when(function () {
+                $tz = (string) config('vouchex.backup_timezone', 'Asia/Kolkata');
+                $at = (string) config('vouchex.backup_daily_at', '13:00');
+                if (! preg_match('/^\d{2}:\d{2}$/', $at)) {
+                    $at = '13:00';
+                }
+
+                return now($tz)->format('H:i') >= $at;
+            })
+            ->withoutOverlapping(120);
     })
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->validateCsrfTokens(except: ['api/*']);

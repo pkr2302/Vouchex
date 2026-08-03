@@ -12061,7 +12061,10 @@ function SettingsTab({ isDemoLogoutMode, setIsDemoLogoutMode, onViewPlans }) {
             <h3 className="form-section-title">3) Automatic daily backup (email)</h3>
             <div style={{ background: 'var(--bg-tertiary)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
               <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 12px 0' }}>
-                Every day at <strong>1:00 PM (India time)</strong>, the server emails one backup file per active company to:
+                Every day from <strong>1:00 PM (India time)</strong>, the server emails a ZIP of one backup file per active company to:
+                {backupEmailStatus?.schedule ? (
+                  <> <span style={{ color: 'var(--text-muted)' }}>({backupEmailStatus.schedule})</span></>
+                ) : null}
               </p>
               <ul style={{ fontSize: '13px', margin: '0 0 12px 20px', color: 'var(--text-primary)' }}>
                 {(backupEmailStatus?.recipients?.length ? backupEmailStatus.recipients : ['rajatlakhani2@gmail.com', 'rajpopatpriyank@gmail.com']).map((email) => (

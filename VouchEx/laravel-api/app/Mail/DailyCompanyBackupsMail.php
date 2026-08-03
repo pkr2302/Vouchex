@@ -42,9 +42,13 @@ class DailyCompanyBackupsMail extends Mailable
     /** @return array<int, Attachment> */
     public function attachments(): array
     {
-        return array_map(
-            fn (array $f) => Attachment::fromPath($f['path'])->as($f['name']),
-            $this->files
-        );
+        return array_map(function (array $f) {
+            $attachment = Attachment::fromPath($f['path'])->as($f['name']);
+            if (! empty($f['mime'])) {
+                $attachment = $attachment->withMime($f['mime']);
+            }
+
+            return $attachment;
+        }, $this->files);
     }
 }
