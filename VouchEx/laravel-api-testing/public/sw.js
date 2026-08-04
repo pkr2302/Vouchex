@@ -1,11 +1,13 @@
 /* VouchEx PWA service worker — keeps the app installable and caches the shell lightly.
  * API/auth requests are never cached.
  */
-const CACHE_NAME = 'vouchex-shell-v1';
+const CACHE_NAME = 'vouchex-shell-v2';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
   '/site.webmanifest',
+  '/pwa-install.js',
+  '/pwa-install.css',
   '/android-chrome-192x192.png',
   '/android-chrome-512x512.png',
   '/android-chrome-512x512-maskable.png',
