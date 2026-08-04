@@ -1,33 +1,57 @@
 {
   "name": "VouchEx — Accounts Made Simple",
   "short_name": "VouchEx",
-  "description": "Cloud GST and accounting platform for SMEs and Chartered Accountants in India.",
-  "start_url": "/",
+  "description": "Cloud GST and accounting platform for SMEs and Chartered Accountants in India. Invoicing, inventory, financial reports, and multi-company access.",
+  "id": "/",
+  "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#f8fafc",
+  "display_override": ["standalone", "browser"],
+  "orientation": "any",
+  "background_color": "#001B5E",
   "theme_color": "#001B5E",
-  "categories": ["finance", "business", "productivity"],
+  "lang": "en-IN",
+  "dir": "ltr",
+  "categories": ["business", "finance", "productivity"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/android-chrome-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/android-chrome-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/android-chrome-512x512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "shortcuts": [
     {
-      "name": "Dashboard",
-      "url": "/",
-      "description": "Open VouchEx portal home"
+      "name": "Open VouchEx",
+      "short_name": "Open",
+      "description": "Open the VouchEx portal",
+      "url": "/?source=pwa-shortcut",
+      "icons": [
+        {
+          "src": "/android-chrome-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

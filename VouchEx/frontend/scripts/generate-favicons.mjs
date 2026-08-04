@@ -26,6 +26,32 @@ const sizes = [
   { name: 'android-chrome-512x512.png', size: 512 },
 ];
 
+/** Maskable icon: logo inset ~18% so Android adaptive icons do not crop the mark. */
+async function writeMaskable512(destDir) {
+  const size = 512;
+  const pad = Math.round(size * 0.18);
+  const inner = size - pad * 2;
+  const logo = await sharp(source)
+    .resize(inner, inner, {
+      fit: 'contain',
+      background: { r: 0, g: 27, b: 94, alpha: 1 },
+    })
+    .png()
+    .toBuffer();
+
+  await sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 3,
+      background: { r: 0, g: 27, b: 94 },
+    },
+  })
+    .composite([{ input: logo, left: pad, top: pad }])
+    .png()
+    .toFile(path.join(destDir, 'android-chrome-512x512-maskable.png'));
+}
+
 async function resizeSquare(size) {
   return sharp(source)
     .resize(size, size, {
@@ -60,12 +86,19 @@ async function main() {
   fs.writeFileSync(path.join(publicDir, 'favicon.ico'), icoBuf);
   console.log('Wrote favicon.ico');
 
+  await writeMaskable512(publicDir);
+  console.log('Wrote android-chrome-512x512-maskable.png');
+
   const laravelPublic = path.resolve(__dirname, '../../laravel-api/public');
   if (fs.existsSync(laravelPublic)) {
     for (const { name } of sizes) {
       fs.copyFileSync(path.join(publicDir, name), path.join(laravelPublic, name));
     }
     fs.copyFileSync(path.join(publicDir, 'favicon.ico'), path.join(laravelPublic, 'favicon.ico'));
+    fs.copyFileSync(
+      path.join(publicDir, 'android-chrome-512x512-maskable.png'),
+      path.join(laravelPublic, 'android-chrome-512x512-maskable.png')
+    );
     console.log('Copied favicons to laravel-api/public');
   }
 }

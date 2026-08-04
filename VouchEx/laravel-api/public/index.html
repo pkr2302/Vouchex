@@ -2,14 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="/favicon.ico?v=20260620" sizes="any" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=20260620" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=20260620" />
-    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png?v=20260620" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png?v=20260620" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=20260620" />
-    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="icon" href="/favicon.ico?v=20260804" sizes="any" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=20260804" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=20260804" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png?v=20260804" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png?v=20260804" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png?v=20260804" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=20260804" />
+    <link rel="manifest" href="/site.webmanifest?v=20260804" />
     <meta name="theme-color" content="#001B5E" />
+    <meta name="msapplication-TileColor" content="#001B5E" />
+    <meta name="application-name" content="VouchEx" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -81,6 +84,13 @@
     <div id="root"></div>
     <noscript>
       <p>VouchEx — cloud GST and accounting software for SMEs and Chartered Accountants in India. Please enable JavaScript to sign in or register.</p>
-    </noscript>
+    </noscript>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
+        });
+      }
+    </script>
   </body>
 </html>

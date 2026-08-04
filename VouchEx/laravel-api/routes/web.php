@@ -16,6 +16,37 @@ Route::get('/config.json', function () {
     return response()->file($path, ['Content-Type' => 'application/json']);
 });
 
+Route::get('/site.webmanifest', function () {
+    $path = public_path('site.webmanifest');
+    abort_unless(File::exists($path), 404);
+
+    return response()->file($path, [
+        'Content-Type' => 'application/manifest+json',
+        'Cache-Control' => 'public, max-age=3600',
+    ]);
+});
+
+Route::get('/sw.js', function () {
+    $path = public_path('sw.js');
+    abort_unless(File::exists($path), 404);
+
+    return response()->file($path, [
+        'Content-Type' => 'application/javascript; charset=UTF-8',
+        'Cache-Control' => 'no-cache, no-store, must-revalidate',
+        'Service-Worker-Allowed' => '/',
+    ]);
+});
+
+Route::get('/.well-known/assetlinks.json', function () {
+    $path = public_path('.well-known/assetlinks.json');
+    abort_unless(File::exists($path), 404);
+
+    return response()->file($path, [
+        'Content-Type' => 'application/json',
+        'Cache-Control' => 'public, max-age=300',
+    ]);
+});
+
 Route::get('/privacy-policy', function () {
     return response()
         ->view('legal.privacy-policy')
